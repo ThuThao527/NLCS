@@ -83,6 +83,7 @@
     height: 400px;
     margin: 20px auto;
     padding: 20px;
+    color: black;
     background-color: rgb(240, 240, 240);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     border-radius: 10px;

@@ -5,9 +5,9 @@
     >
       <img src="../assets/logo.png" alt="Logo" class="logo" />
       <div class="line"></div>
-      <h1 style="font-size: 30px">Join the community!</h1>
+      <h1 style="font-size: 30px">Tham gia vào cộng đồng của chúng tôi!</h1>
       <div style="width: 200px">
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+        Để biết thêm nhiều thông tin và lợi ích từ dịch vụ.
       </div>
     </div>
     <div
@@ -39,13 +39,14 @@
 </template>
 <style scoped>
 footer {
-  background-image: url('https://media.istockphoto.com/id/1365100258/vi/anh/nh%C3%ACn-t%E1%BB%AB-tr%C3%AAn-kh%C3%B4ng-c%E1%BB%A7a-thuy%E1%BB%81n-v%C3%A0-nh%E1%BB%AFng-ng%C6%B0%E1%BB%9Di-%C4%91i-tr%C3%AAn-h%E1%BB%93-thuy%E1%BB%81n-%C4%91i-qua-lau-s%E1%BA%ADy-chuy%E1%BA%BFn-%C4%91i-thuy%E1%BB%81n.jpg?s=2048x2048&w=is&k=20&c=YtfFaKyvq1QFRGNSe3kQJnbS09n1ZVAmF7eaGhmjcjo=');
+  background-image: url('https://www.realsimple.com/thmb/VRH1_Fk5MRzpHSG1gutVvIAJjiM=/1500x0/filters:no_upscale():max_bytes(200000):strip_icc()/how-to-clean-everything-tout-44daa25fd71448ddba7757b6f4fe14d4.pnghttps://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-VodueRjbuYW0fYzktOENmE1FQyTHNncLSA&s');
   /* background-position:center; */
   background-size: cover;
   background-repeat: no-repeat;
   padding-bottom: 10px;
   /* background-color: #1f; */
   position: relative;
+  background-color: black;
 }
 .content {
   /* background-color: bisque; */

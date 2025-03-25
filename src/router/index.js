@@ -42,7 +42,7 @@ const router = createRouter({
       component: Charity,
     },
     // { path: '/blogs', component: BlogList },
-    { path: '/blogs/:id', component: BlogDetail },
+    { path: '/blogs/:id', name: 'BlogDetail', component: BlogDetail },
     { path: '/create', component: BlogForm },
     { path: '/sign_in_and_out', component: Sign_In_And_Out },
     {
@@ -51,12 +51,8 @@ const router = createRouter({
       component: FileViewer,
     },
     {
-      path: '/TourDetail/:tourid',
-      component: TourDetail,
-    },
-    {
       path: '/OrderHistory',
-      component: OrderHistory,
+      component: TourDetail,
     },
   ],
   scrollBehavior(to, from, savedPosition) {

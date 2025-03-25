@@ -1,52 +1,40 @@
 <script setup>
 import Card from './Card.vue';
 
-// document.addEventListener("DOMContentLoaded", function () {
-//     const video = document.getElementById("myVideo");
-
-//     const observer = new IntersectionObserver((entries) => {
-//         entries.forEach(entry => {
-//             if (entry.isIntersecting) {
-//                 video.play(); // Phát video khi xuất hiện trong khung nhìn
-//             } else {
-//                 video.pause(); // Tạm dừng video khi ra khỏi khung nhìn
-//             }
-//         });
-//     });
-
-//     observer.observe(video); // Theo dõi video
-// });
 </script>
 
 <template>
   <div class="cardslayout container text-center justify-content-center">
     <div class="cards row justify-content-center">
       <Card
-        title="Local Guides"
-        description="Lorem ipsum dolor sit amet consectetur, adipisicing elit. Dolorum delectus amet ducimus unde labore eaque quas quam asperiores sunt, ea, et minus eligendi?"
-        image="https://i.pinimg.com/736x/ce/b7/77/ceb77763743d02ed0b8f2970fd807466.jpg"
+        title="Uy Tín - Chuyên Nghiệp"
+        description="Cam kết dịch vụ đúng giờ, nhân viên được đào tạo bài bản, làm việc có trách nhiệm.
+          Khách hàng yên tâm về độ tin cậy, minh bạch trong quy trình và hợp đồng rõ ràng."
+        image="https://www.thespruce.com/thmb/f-8SHiPrpdI-V5cfbamOOno5fzI=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/SPR-house-cleaning-checklist-5443113-hero-bfe165b4af2f4a86ac0ace570db9a333.jpg"
         buttonLink="/About"
-        buttonText="Meet The Team"
+        buttonText="Tìm hiểu thêm"
       />
       <Card
-        title="Unique Accommodation"
-        description="Lorem ipsum dolor sit amet consectetur, adipisicing elit. Dolorum delectus amet ducimus unde labore eaque quas quam asperiores sunt, ea, et minus eligendi?"
-        image="https://i.pinimg.com/736x/be/45/d0/be45d0b0c9cef355b656923698219aeb.jpg"
-        buttonText="Where we stay"
+        title="Sạch Sẽ - Tỉ Mỉ"
+        description="Sử dụng công nghệ/thiết bị hiện đại, vệ sinh toàn diện từ góc nhỏ đến không gian lớn.
+        Môi trường sống/làm việc sạch sẽ, không sót khu vực, đảm bảo vệ sinh tiêu chuẩn cao."
+        image="https://img.iproperty.com.my/angel/750x1000-fit/wp-content/uploads/sites/2/2021/03/professional-house-cleaning-services-malaysia.jpg"
+        buttonText="Tìm hiểu thêm"
       />
       <Card
-        title="Giving Back Projects"
-        description="Lorem ipsum dolor sit amet consectetur, adipisicing elit. Dolorum delectus amet ducimus unde labore eaque quas quam asperiores sunt, ea, et minus eligendi?"
-        image="https://i.pinimg.com/736x/56/54/89/5654899f3c367d70e82b25e42f306a07.jpg"
+        title="An Toàn - Thân Thiện"
+        description="Hóa chất an toàn, thân thiện với trẻ em/vật nuôi, nhân viên lịch sự và tôn trọng không gian riêng tư.
+Bảo vệ sức khỏe gia đình và môi trường, trải nghiệm dịch vụ thoải mái."
+        image="https://fastmaidservice.com/wp-content/uploads/2024/02/House-Cleaning-Service-scaled.jpeg"
         buttonLink="/Charity"
-        buttonText="Charity Project"
+        buttonText="Tìm hiểu thêm"
       />
     </div>
     <iframe
       style="border-radius: 10px"
       class="embed-responsive-item video"
       id="myVideo"
-      src="https://www.youtube.com/embed/NSnkb1IAjbE?autoplay=1&mute=1"
+      src="https://www.youtube.com/embed/IJCEpbIHTa8?si=Zom0e-alZtNKHuv6"
       frameborder="0"
       allow="autoplay; encrypted-media"
       allowfullscreen
@@ -57,7 +45,7 @@ import Card from './Card.vue';
 <style scoped>
 .cardslayout {
   min-width: 100%;
-  background-color: #4f92bf;
+  background-color:  rgb(228, 219, 196);
   margin: 0;
   height: max-content;
 }

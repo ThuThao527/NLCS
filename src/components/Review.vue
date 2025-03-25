@@ -44,14 +44,38 @@
     data() {
       return {
         feedbacks: [
-          { image: "https://i.pinimg.com/736x/c5/8e/3a/c58e3af9ccd207f2f9a78a5c931513c8.jpg", name: "John Doe", text: "This is an awesome service! Lorem ipsum dolor sit, amet consectetur adipisicing elit. Dolorum nemo voluptate voluptatibus officiis aliquam sint blanditiis earum voluptas eum. Iusto totam delectus amet deserunt modi dignissimos voluptatem voluptatibus ea aut." },
-          { image: "https://i.pinimg.com/736x/d9/0d/c7/d90dc706dcb183adbe3cd58fd4415732.jpg", name: "Asa Walter", text: "They revamped my company Lorem ipsum dolor sit, amet consectetur adipisicing elit. Dolorum nemo voluptate voluptatibus officiis aliquam sint blanditiis earum voluptas eum. Iusto totam delectus amet deserunt modi dignissimos voluptatem voluptatibus ea aut." },
-          { image: "https://i.pinimg.com/736x/52/4f/c3/524fc353686d6ca311561a5e8ebfb8bc.jpg", name: "Zahid Miles", text: "Loved working with them.Lorem ipsum dolor sit, amet consectetur adipisicing elit. Dolorum nemo voluptate voluptatibus officiis aliquam sint blanditiis earum voluptas eum. Iusto totam delectus amet deserunt modi dignissimos voluptatem voluptatibus ea aut." },
-          { image: "https://i.pinimg.com/236x/a1/1c/a8/a11ca852b646486bf3a865eba30cdb44.jpg", name: "Casper Leigh", text: "I will continue using their services.Lorem ipsum dolor sit, amet consectetur adipisicing elit. Dolorum nemo voluptate voluptatibus officiis aliquam sint blanditiis earum voluptas eum. Iusto totam delectus amet deserunt modi dignissimos voluptatem voluptatibus ea aut." },
-          { image: "https://i.pinimg.com/736x/95/ce/8e/95ce8e731cff602f4065f73799147cb9.jpg", name: "Cian Ross", text: "They are very knowledgeable.Lorem ipsum dolor sit, amet consectetur adipisicing elit. Dolorum nemo voluptate voluptatibus officiis aliquam sint blanditiis earum voluptas eum. Iusto totam delectus amet deserunt modi dignissimos voluptatem voluptatibus ea aut." },
-          { image: "https://i.pinimg.com/236x/c2/60/1d/c2601dddaba71f57b39025e02aefc3b3.jpg", name: "Nina Snow", text: "Excellent quality services.Lorem ipsum dolor sit, amet consectetur adipisicing elit. Dolorum nemo voluptate voluptatibus officiis aliquam sint blanditiis earum voluptas eum. Iusto totam delectus amet deserunt modi dignissimos voluptatem voluptatibus ea aut." },
-        ],
-        size: 3,
+            { 
+              image: "https://i.pinimg.com/736x/c5/8e/3a/c58e3af9ccd207f2f9a78a5c931513c8.jpg", 
+              name: "Nguyễn Văn An", 
+              text: "Dịch vụ tuyệt vời! Nhân viên đến đúng giờ, làm việc rất chuyên nghiệp. Nhà tôi sạch bóng sau 2 giờ, mọi ngóc ngách đều được xử lý kỹ lưỡng. Giá cả lại hợp lý nữa!" 
+            },
+            { 
+              image: "https://i.pinimg.com/736x/d9/0d/c7/d90dc706dcb183adbe3cd58fd4415732.jpg", 
+              name: "Trần Thị Bình", 
+              text: "Căn hộ của tôi như được hồi sinh sau khi sử dụng dịch vụ. Đặc biệt ấn tượng với cách họ xử lý các vết bẩn cứng đầu trên sàn gỗ mà không làm trầy xước. Rất đáng đồng tiền!" 
+            },
+            { 
+              image: "https://i.pinimg.com/736x/52/4f/c3/524fc353686d6ca311561a5e8ebfb8bc.jpg", 
+              name: "Lê Minh Cường", 
+              text: "Tôi đã thử nhiều dịch vụ nhưng đây là lần đầu hoàn toàn hài lòng. Nhân viên thân thiện, mang giày dép riêng khi vào nhà, và còn dọn dẹp gọn ghẽ dụng cụ sau khi làm xong. 10 điểm!" 
+            },
+            { 
+              image: "https://i.pinimg.com/236x/a1/1c/a8/a11ca852b646486bf3a865eba30cdb44.jpg", 
+              name: "Phạm Thu Hà", 
+              text: "Sẽ tiếp tục ủng hộ dịch vụ lâu dài. Mỗi tuần họ đến dọn 2 lần, nhà cửa luôn thơm tho, sạch sẽ. Con tôi bị dị ứng bụi mà từ ngày dùng dịch vụ này đỡ hẳn." 
+            },
+            { 
+              image: "https://i.pinimg.com/736x/95/ce/8e/95ce8e731cff602f4065f73799147cb9.jpg", 
+              name: "Vũ Đức Duy", 
+              text: "Rất chuyên nghiệp! Họ có đầy đủ dụng cụ từ máy hút bụi HEPA đến hóa chất an toàn. Nhân viên còn hướng dẫn tôi cách bảo quản nội thất sau khi dọn. Dịch vụ 5 sao!" 
+            },
+            { 
+              image: "https://i.pinimg.com/236x/c2/60/1d/c2601dddaba71f57b39025e02aefc3b3.jpg", 
+              name: "Hoàng Thị Lan", 
+              text: "Chất lượng dịch vụ xuất sắc! Từ lần đầu sử dụng đến giờ luôn ổn định. Đặc biệt thích cách họ bọc giày dép bằng nilon và lau chùi tay nắm cửa kỹ lưỡng, rất an tâm mùa dịch." 
+            },
+          ],
+          size: 3
       };
     },
 
@@ -99,6 +123,9 @@
   .carousel-control-next-icon {
     background-color: rgb(0, 0, 0, 0.2);
     border-radius: 50%;
+  }
+  .carousel .slide{
+    background-color: #b3ede4;
   }
   </style>
   

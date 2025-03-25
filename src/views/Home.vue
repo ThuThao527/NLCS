@@ -2,7 +2,7 @@
   <div class="body">
     <header>
       <Navigate class="navigate"></Navigate>
-      <HeroSection image="https://media.istockphoto.com/id/488876192/vi/anh/hoi-an-vietnam.jpg?s=2048x2048&w=is&k=20&c=i9PyzEChi5gMuB4Jf1HAzOmdEmY28_Bo3aBVx0tJb3Q=" p1="HARMONY CHARITY TRAVEL" p2="VOLUNTEER & CULTURE"></HeroSection>
+      <HeroSection image ="https://cdn.prod.website-files.com/60eece3229f951ea48ce43b4/6638df8d1ce1f556221e1c05_how-often-should-you-clean-everything-in-your-house.webp" p1="Book Your Helper" p2="Reputation & Quality"></HeroSection>
     </header>
     <main>
       <CardsLayout></CardsLayout>
@@ -16,6 +16,37 @@
 <style>
 .navigatge{
   margin: auto;
+}
+
+.hero-section {
+  position: relative;
+  height: 850px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: white;
+} 
+
+.content {
+  position: relative;
+  z-index: 2;
+}
+
+h1 {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* Thêm bóng để chữ dễ đọc */
+}
+
+p {
+  font-size: 1.2rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 </style>
 

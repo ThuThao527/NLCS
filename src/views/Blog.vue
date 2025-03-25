@@ -4,20 +4,16 @@
       <Navigate></Navigate>
       <div class="heroimage">
         <HeroSection
-          image="https://media.istockphoto.com/id/1154241782/vi/anh/ph%E1%BB%91-c%E1%BB%95-h%E1%BB%99i-an-v%C3%A0o-bu%E1%BB%95i-s%C3%A1ng.jpg?s=2048x2048&w=is&k=20&c=W77qSC4nfw_c0xGXhV8y3tfA2raTwsklv9rZEbj9Heg="
-          p1="Meaningful Adventures"
-          p2="Charity Stories from Our Tours"
+          image="https://www.contemporaryrugs.eu/wp-content/uploads/2023/08/5-Charming-Contemporary-Rugs-To-Create-a-Striking-Living-Room-Design-4-scaled.jpg"
+          p1="Mẹo vặt cuộc sống"
+          p2="Giúp việc dọn dẹp của bạn dễ dàng hơn"
         ></HeroSection>
       </div>
-      <div class="content text-center">
-        Lorem ipsum dolor sit, amet consectetur adipisicing elit. Eius sapiente
-        in error, animi nostrum ut suscipit corrupti voluptas, doloribus facilis
-        et illo assumenda est alias autem! Iure nostrum dolores asperiores?
-      </div>
+      
     </header>
     <main>
       <BlogList></BlogList>
-      <PdfViewer></PdfViewer>
+      <!-- <PdfViewer></PdfViewer> -->
       <Footer></Footer>
     </main>
   </div>
@@ -27,6 +23,10 @@
 .heroimage {
   height: 450px;
   overflow: hidden;
+}
+.body{
+  background-color: rgb(210, 204, 196) !important;
+  color: black;
 }
 
 header .content {
@@ -51,37 +51,37 @@ const formData = reactive({
   admin: false,
 });
 
-const isAdmin = async () => {
-  // Lấy thông tin người dùng từ localStorage
-  const userData = JSON.parse(localStorage.getItem('user'));
+// const isAdmin = async () => {
+//   // Lấy thông tin người dùng từ localStorage
+//   const userData = JSON.parse(localStorage.getItem('user'));
 
-  if (userData) {
-    // Lấy mảng admins từ một hàm bất đồng bộ fetchAdmin
-    const admins = await fetchAdmin();
+//   if (userData) {
+//     // Lấy mảng admins từ một hàm bất đồng bộ fetchAdmin
+//     const admins = await fetchAdmin();
 
-    // Kiểm tra xem có id nào trong admins bằng với userData.id không
-    formData.admin = admins.some((admin) => admin.id === userData.id);
+//     // Kiểm tra xem có id nào trong admins bằng với userData.id không
+//     formData.admin = admins.some((admin) => admin.id === userData.id);
 
-    if (formData.admin) {
-      console.log('User is an admin');
-    } else {
-      console.log('User is not an admin');
-    }
-  } else {
-    console.log('No user data found');
-  }
-};
+//     if (formData.admin) {
+//       console.log('User is an admin');
+//     } else {
+//       console.log('User is not an admin');
+//     }
+//   } else {
+//     console.log('No user data found');
+//   }
+// };
 
-const fetchAdmin = async () => {
-  try {
-    const response = await axios.get(`/api/users/admin`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-  }
-};
+// const fetchAdmin = async () => {
+//   try {
+//     const response = await axios.get(`/api/users/admin`);
+//     return response.data;
+//   } catch (error) {
+//     console.error('Error fetching comments:', error);
+//   }
+// };
 
-onMounted(() => {
-  isAdmin();
-});
+// onMounted(() => {
+//   isAdmin();
+// });
 </script>

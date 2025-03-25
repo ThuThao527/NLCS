@@ -27,14 +27,12 @@
           </svg>
         </div>
         <HeroSection
-          image="https://media.istockphoto.com/id/1154241782/vi/anh/ph%E1%BB%91-c%E1%BB%95-h%E1%BB%99i-an-v%C3%A0o-bu%E1%BB%95i-s%C3%A1ng.jpg?s=2048x2048&w=is&k=20&c=W77qSC4nfw_c0xGXhV8y3tfA2raTwsklv9rZEbj9Heg="
-          p1="About Us"
+          image="https://media.architecturaldigest.com/photos/63c03bb39e3c619a867bf36a/16:9/w_1920,c_limit/carpet%20cleaning.jpg"
+          p1="Về chúng tôi"
         ></HeroSection>
       </div>
       <div class="content text-center">
-        Lorem ipsum dolor sit, amet consectetur adipisicing elit. Eius sapiente
-        in error, animi nostrum ut suscipit corrupti voluptas, doloribus facilis
-        et illo assumenda est alias autem! Iure nostrum dolores asperiores?
+        <p>Chúng tôi là nền tảng đặt lịch người giúp việc hàng đầu, mang đến giải pháp tiện lợi, nhanh chóng và đáng tin cậy để hỗ trợ bạn trong cuộc sống bận rộn.</p>
       </div>
     </header>
     <main>
@@ -46,7 +44,7 @@
           style="border-radius: 10px"
           class="embed-responsive-item video"
           id="myVideo"
-          src="https://www.youtube.com/embed/NSnkb1IAjbE?autoplay=1&mute=1"
+          src="https://www.youtube.com/embed/HOKtWDRwMNA?si=_JTkrMI7mVt4_zxi"
           frameborder="0"
           allow="autoplay; encrypted-media"
           allowfullscreen
@@ -69,6 +67,7 @@ import Core_Value from '@/components/Core_Value.vue';
 <style scoped>
 main {
   overflow: hidden;
+  background-color: rgb(228, 219, 196);
 }
 .heroimage {
   position: relative;
@@ -126,5 +125,8 @@ iframe {
     height: 500px;
     margin: 30px;
   }
+}
+.content .text-center p {
+  font-size: 1.5 rem;
 }
 </style>

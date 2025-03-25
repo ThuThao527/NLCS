@@ -2,12 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql2';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+
 
 const app = express();
 const port = 3000;
 
-// Cấu hình CORS và Express
-app.use(cors());
+app.use(express.json({ limit: '50mb' })); // Tăng giới hạn payload JSON
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+axios.defaults.baseURL = ''; // Để trống
 
 app.use(
   cors({
@@ -31,9 +36,12 @@ app.use(function (req, res, next) {
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  password: process.env.PASSWORD_MYSQL, // Thay bằng mật khẩu của bạn
-  database: 'blog_db', // Tên database
+  password: '',
+  //password: process.env.PASSWORD_MYSQL, // Thay bằng mật khẩu của bạn
+  database: 'Tourmanagement', // Tên database
+   connectTimeout: 10000,
 });
+
 
 db.connect((err) => {
   if (err) {
@@ -44,232 +52,6 @@ db.connect((err) => {
   }
 });
 
-// API tìm bài viết mới nhất
-app.get('/api/posts/related', (req, res) => {
-  const query = `
-    SELECT posts.id, posts.created_at, posts.views, 
-           users.username AS author, users.image_avatar AS authorAvatar, categories.name AS category,
-           post_content.title, post_content.subtitle, post_content.content_intro, post_content.quote, post_content.content_body, post_content.image_url
-    FROM posts
-    INNER JOIN users ON posts.author_id = users.id
-    INNER JOIN categories ON posts.category_id = categories.id
-    INNER JOIN post_content ON posts.id = post_content.post_id
-    WHERE categories.name = 'blog'
-    ORDER BY posts.created_at DESC
-    LIMIT 3`;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching related posts:', err);
-      res.status(500).json({ message: 'Error fetching related posts' });
-    } else {
-      res.json(results);
-    }
-  });
-});
-
-// API lấy danh sách bài viết (kết hợp posts và post_content)
-// app.get('/api/posts', (req, res) => {
-//   const query = `SELECT posts.id, posts.created_at, posts.views,
-//            users.username AS author, users.image_avatar AS authorAvatar, categories.name AS category,
-//            post_content.title, post_content.subtitle, post_content.content_intro, post_content.quote, post_content.content_body, post_content.image_url
-//     FROM posts
-//     INNER JOIN users ON posts.author_id = users.id
-//     INNER JOIN categories ON posts.category_id = categories.id
-//     INNER JOIN post_content ON posts.id = post_content.post_id
-//     ORDER BY posts.created_at DESC;`;
-//   db.query(query, (err, results) => {
-//     if (err) {
-//       res.status(500).json({ message: 'Error retrieving posts' });
-//     } else {
-//       res.json(results);
-//     }
-//   });
-// });
-
-app.get('/api/posts', (req, res) => {
-  const category_name = req.query.category_name; // Lấy category_id từ tham số query
-  // Xây dựng phần WHERE trong câu truy vấn
-  let query = `SELECT posts.id, posts.created_at, posts.views, 
-           users.username AS author, users.image_avatar AS authorAvatar, categories.name AS category,
-           post_content.title, post_content.subtitle, post_content.content_intro, post_content.quote, post_content.content_body, post_content.link, post_content.image_url, post_content.id as post_content_id
-    FROM posts
-    INNER JOIN users ON posts.author_id = users.id
-    INNER JOIN categories ON posts.category_id = categories.id
-    INNER JOIN post_content ON posts.id = post_content.post_id`;
-
-  // Nếu có category_id, thêm điều kiện WHERE vào câu truy vấn
-  if (category_name) {
-    query += ` WHERE categories.name = ?`;
-  } else {
-    query += ` WHERE categories.name = 'blog'`;
-  }
-
-  query += ` ORDER BY posts.created_at DESC;`; // Sắp xếp theo thời gian tạo mới nhất
-
-  // Thực thi truy vấn
-  db.query(query, [category_name], (err, results) => {
-    if (err) {
-      res.status(500).json({ message: 'Error retrieving posts' });
-    } else {
-      res.json(results);
-    }
-  });
-});
-
-// API để xóa bài đăng và nội dung bài đăng
-app.delete('/api/posts/:postId/contents/:postContentId', (req, res) => {
-  const { postId, postContentId } = req.params;
-
-  // Kiểm tra sự tồn tại của bài đăng và nội dung bài đăng
-  const checkQuery = `
-    SELECT * FROM posts 
-    INNER JOIN post_content ON posts.id = post_content.post_id 
-    WHERE posts.id = ? AND post_content.id = ?
-  `;
-
-  db.query(checkQuery, [postId, postContentId], (err, result) => {
-    if (err) {
-      return res.status(500).json({
-        message: 'Error checking post and content',
-        error: err.message,
-      });
-    }
-
-    if (result.length === 0) {
-      return res.status(404).json({ message: 'Post or content not found' });
-    }
-
-    // Xóa nội dung bài đăng
-    const deleteContentQuery = 'DELETE FROM post_content WHERE id = ?';
-    db.query(deleteContentQuery, [postContentId], (err) => {
-      if (err) {
-        return res
-          .status(500)
-          .json({ message: 'Error deleting post content', error: err.message });
-      }
-
-      // Xóa bài đăng nếu không còn nội dung nào liên kết
-      const checkRemainingContentsQuery =
-        'SELECT * FROM post_content WHERE post_id = ?';
-      db.query(
-        checkRemainingContentsQuery,
-        [postId],
-        (err, remainingContents) => {
-          if (err) {
-            return res.status(500).json({
-              message: 'Error checking remaining content',
-              error: err.message,
-            });
-          }
-
-          if (remainingContents.length === 0) {
-            const deletePostQuery = 'DELETE FROM posts WHERE id = ?';
-            db.query(deletePostQuery, [postId], (err) => {
-              if (err) {
-                return res
-                  .status(500)
-                  .json({ message: 'Error deleting post', error: err.message });
-              }
-
-              return res
-                .status(200)
-                .json({ message: 'Post and content deleted successfully' });
-            });
-          } else {
-            return res.status(200).json({
-              message: 'Content deleted successfully, post still exists',
-            });
-          }
-        }
-      );
-    });
-  });
-});
-
-// API lấy chi tiết bài viết theo ID (posts và post_content)
-app.get('/api/posts/:id', (req, res) => {
-  const postId = req.params.id;
-  const query = `
-    SELECT posts.id, posts.created_at, posts.views, users.id AS user_id,
-           users.username AS author, users.image_avatar AS authorAvatar, categories.name AS category,
-           post_content.title, post_content.subtitle, post_content.content_intro, post_content.quote, post_content.content_body, post_content.image_url
-    FROM posts
-    INNER JOIN users ON posts.author_id = users.id
-    INNER JOIN categories ON posts.category_id = categories.id
-    INNER JOIN post_content ON posts.id = post_content.post_id
-    WHERE posts.id = ?`;
-  db.query(query, [postId], (err, results) => {
-    if (err) {
-      console.log('Error retrieving blog post');
-      res.status(500).json({ message: 'Error retrieving blog post' });
-    } else if (results.length === 0) {
-      console.log('Post not found');
-      res.status(404).json({ message: 'Post not found' });
-    } else {
-      res.json(results[0]);
-    }
-  });
-});
-
-// API đăng bài viết mới (posts và post_content)
-app.post('/api/posts', (req, res) => {
-  const {
-    author_id,
-    category_id,
-    image_url,
-    title,
-    subtitle,
-    content_intro,
-    quote,
-    content_body,
-    link,
-  } = req.body;
-
-  // Thêm vào bảng posts
-  const insertPostQuery = `
-    INSERT INTO posts (author_id, category_id)
-    VALUES (?, ?)
-  `;
-
-  db.query(insertPostQuery, [author_id, category_id], (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error creating post' });
-    }
-
-    const postId = result.insertId;
-
-    // Thêm chi tiết bài viết vào bảng post_content
-    const insertContentQuery = `
-      INSERT INTO post_content (post_id, title, subtitle, content_intro, quote, content_body, image_url, link)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    db.query(
-      insertContentQuery,
-      [
-        postId,
-        title,
-        subtitle,
-        content_intro,
-        quote,
-        content_body,
-        image_url,
-        link,
-      ],
-      (err) => {
-        if (err) {
-          res.status(500).json({ message: 'Error creating post content' });
-        } else {
-          res.status(201).json({
-            message: 'Post created successfully',
-            postId: postId,
-          });
-        }
-      }
-    );
-  });
-});
 
 // API lấy danh sách admin
 app.get('/api/users/admin', (req, res) => {
@@ -290,231 +72,6 @@ app.get('/api/categories', (req, res) => {
       res.status(500).json({ message: 'Error retrieving categories' });
     } else {
       res.json(results);
-    }
-  });
-});
-
-// API thêm danh mục mới
-app.post('/api/categories', (req, res) => {
-  const { name } = req.body;
-  const query = `
-    INSERT INTO categories (name)
-    VALUES (?)
-  `;
-  db.query(query, [name], (err, result) => {
-    if (err) {
-      res.status(500).json({ message: 'Error creating category' });
-    } else {
-      res.status(201).json({
-        message: 'Category created successfully',
-        categoryId: result.insertId,
-      });
-    }
-  });
-});
-
-// API lấy danh sách bình luận cho bài viết
-app.get('/api/posts/:postId/comments', (req, res) => {
-  const { postId } = req.params;
-  const query = `
-    SELECT 
-      comments.id, 
-      comments.content, 
-      comments.author_id, 
-      comments.created_at,
-      users.image_avatar AS author_avatar,
-      users.username as name
-    FROM comments
-    JOIN users ON comments.author_id = users.id
-    WHERE comments.post_id = ?
-  `;
-  db.query(query, [postId], (err, results) => {
-    if (err) {
-      res.status(500).json({ message: 'Error retrieving comments' });
-    } else {
-      res.json(results);
-    }
-  });
-});
-
-// API thêm bình luận cho bài viết
-app.post('/api/posts/:postId/comments', (req, res) => {
-  const { postId } = req.params;
-  const { author_name, content, email } = req.body;
-
-  // Truy vấn để lấy author_id từ bảng users dựa trên email
-  const getUserQuery = 'SELECT id FROM users WHERE email = ?';
-
-  db.query(getUserQuery, [email], (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error fetching user data' });
-    }
-
-    if (result.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Lấy author_id từ kết quả truy vấn
-    const author_id = result[0].id;
-
-    // Tiến hành chèn bình luận vào bảng comments
-    const insertCommentQuery =
-      'INSERT INTO comments (post_id, author_id, content) VALUES (?, ?, ?)';
-
-    db.query(
-      insertCommentQuery,
-      [postId, author_id, content],
-      (err, result) => {
-        if (err) {
-          return res.status(500).json({ message: 'Error creating comment' });
-        }
-
-        res.status(201).json({
-          message: 'Comment created successfully',
-          commentId: result.insertId,
-        });
-      }
-    );
-  });
-});
-
-//API xóa comment
-app.delete('/api/posts/:postId/comments/:commentId', (req, res) => {
-  const { postId, commentId } = req.params;
-  const { author_id } = req.body; // Lấy `author_id` từ body của request
-
-  // Truy vấn để xóa bình luận dựa trên `author_id`, `post_id` và `id`
-  const deleteCommentQuery =
-    'DELETE FROM comments WHERE id = ? AND post_id = ? AND author_id = ?';
-
-  db.query(
-    deleteCommentQuery,
-    [commentId, postId, author_id],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({ message: 'Error deleting comment' });
-      }
-
-      if (result.affectedRows === 0) {
-        return res
-          .status(404)
-          .json({ message: 'Comment not found or unauthorized' });
-      }
-
-      res.status(200).json({ message: 'Comment deleted successfully' });
-    }
-  );
-});
-
-// API đếm số comment của bài viết
-app.get('/api/comments/:postId', (req, res) => {
-  const postId = req.params.postId;
-
-  if (postId == undefined) {
-    return res.status(400).json({ message: 'PostId is required' });
-  }
-
-  const query = `SELECT COUNT(*) as count FROM comments Where post_id = ?`;
-
-  db.query(query, [postId], (err, results) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).json({ message: 'Error checking like status' });
-    }
-
-    if (results) {
-      return res.status(200).json(results[0].count);
-    }
-  });
-});
-
-// API tăng/giảm lượt thích
-app.post('/api/posts/:id/like', (req, res) => {
-  const postId = req.params.id; // ID bài viết
-  const { userId, action } = req.body; // ID người dùng và hành động ('like' hoặc 'unlike')
-
-  if (!['like', 'unlike'].includes(action)) {
-    return res.status(400).json({ message: 'Invalid action' });
-  }
-
-  // Thực hiện thêm hoặc xóa bản ghi trong bảng user_likes
-  if (action === 'like') {
-    const addLikeQuery = `
-        INSERT INTO user_likes (user_id, post_id)
-        VALUES (?, ?)
-        ON DUPLICATE KEY UPDATE id=id; -- Đảm bảo không thêm trùng lặp
-      `;
-    db.query(addLikeQuery, [userId, postId], (err) => {
-      if (err) {
-        console.error(err.message);
-        return res.status(500).json({ message: 'Error adding to user_likes' });
-      }
-      return res.status(200).json({ message: 'Post liked successfully' });
-    });
-  } else if (action === 'unlike') {
-    const removeLikeQuery = `
-        DELETE FROM user_likes
-        WHERE user_id = ? AND post_id = ?
-      `;
-    db.query(removeLikeQuery, [userId, postId], (err) => {
-      if (err) {
-        console.error(err.message);
-        return res
-          .status(500)
-          .json({ message: 'Error removing from user_likes' });
-      }
-      return res.status(200).json({ message: 'Post unliked successfully' });
-    });
-  }
-});
-
-//API đếm số lượt like của bài viết
-app.get('/api/user_likes/:postId', (req, res) => {
-  const postId = req.params.postId;
-
-  if (postId == undefined) {
-    return res.status(400).json({ message: 'PostId is required' });
-  }
-
-  const query = `SELECT COUNT(*) as count FROM user_likes Where post_id = ?`;
-
-  db.query(query, [postId], (err, results) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).json({ message: 'Error checking like status' });
-    }
-
-    if (results) {
-      return res.status(200).json(results[0].count);
-    }
-  });
-});
-
-// API kiểm tra người dùng đã like bài viết hay chưa
-app.get('/api/posts/:userId/is-liked/:postId', (req, res) => {
-  const userId = req.params.userId;
-  const postId = req.params.postId;
-
-  if (userId === undefined || userId == null) {
-    return res.status(400).json({ message: 'User ID is required' });
-  }
-
-  const query = `
-    SELECT *
-    FROM user_likes
-    WHERE user_id = ? AND post_id = ?
-  `;
-
-  db.query(query, [userId, postId], (err, results) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).json({ message: 'Error checking like status' });
-    }
-
-    if (results.length === 0) {
-      return res.status(200).json({ isLiked: false });
-    } else {
-      return res.status(200).json({ isLiked: true });
     }
   });
 });
@@ -614,7 +171,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // API đăng nhập (Login)
-app.post('/api/login', async (req, res) => {
+app.post('/api/loginold', async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -662,6 +219,130 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.post('/api/login',  (req, res) => {
+  const { Email } = req.body;
+  let { Password } = req.body;
+  Password = Password.trim();
+
+  // Kiểm tra dữ liệu đầu vào
+  if (!Email || !Password) {
+    return res.status(400).json({ message: 'Email and Password are required' });
+  }
+
+  // Kiểm tra định dạng email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(Email)) {
+    return res.status(400).json({ message: 'Invalid email format' });
+  }
+
+  // Kiểm tra email trong bảng User
+  db.query(
+    `SELECT * FROM user WHERE Email = ?`,
+    [Email],
+    (err, userResults) => {
+      if (err) {
+        console.error('Database error (User table):', err);
+        return res.status(500).json({ message: 'Database error', error: err.message });
+      }
+
+      // Nếu tìm thấy user trong bảng User
+      if (userResults.length > 0) {
+        const user = userResults[0];
+
+        // Kiểm tra mật khẩu
+        bcrypt.compare(Password, user.Password, (err, isPasswordValid) => {
+          if (err) {
+            console.error('Error comparing password:', err);
+            return res.status(500).json({ message: 'Error comparing password', error: err.message });
+          }
+
+          if (!isPasswordValid) {
+            return res.status(400).json({
+              message: "Invalid email or password or you registered with Google, please login with Google",
+            });
+          }
+
+          // Tạo token
+          const token = jwt.sign(
+            { userId: user.UserID, email: user.Email, role: user.Role }, // Payload
+            'your-secret-key', // Secret key (nên lưu trong biến môi trường)
+            { expiresIn: '1h' } // Thời gian hết hạn: 1 giờ
+          );
+
+          // Đăng nhập thành công, trả về thông tin user kèm token
+          res.status(200).json({
+            message: 'Login successful',
+            token, // Trả về token
+            user: {
+              UserID: user.UserID,
+              Email: user.Email,
+              FullName: user.FullName,
+              PhoneNumber: user.PhoneNumber,
+              Address: user.Address,
+              AvatarUrl: user.AvatarUrl,
+              Role: user.Role,
+            },
+          });
+        });
+      } else {
+        // Nếu không tìm thấy trong bảng User, kiểm tra trong bảng Helper
+        db.query(
+          `SELECT * FROM helper WHERE Email = ?`,
+          [Email],
+          (err, helperResults) => {
+            if (err) {
+              console.error('Database error (Helper table):', err);
+              return res.status(500).json({ message: 'Database error', error: err.message });
+            }
+
+            if (helperResults.length === 0) {
+              return res.status(400).json({ message: 'Invalid email or password' });
+            }
+
+            const helper = helperResults[0];
+
+            // Kiểm tra mật khẩu
+            bcrypt.compare(Password, helper.Password, (err, isPasswordValid) => {
+              if (err) {
+                console.error('Error comparing password:', err);
+                return res.status(500).json({ message: 'Error comparing password', error: err.message });
+              }
+
+              if (!isPasswordValid) {
+                return res.status(400).json({
+                  message: "Invalid email or password or you registered with Google, please login with Google",
+                });
+              }
+
+              // Tạo token
+              const token = jwt.sign(
+                { userId: helper.HelperID, email: helper.Email, role: 'Helper' }, // Payload
+                'your-secret-key', // Secret key (nên lưu trong biến môi trường)
+                { expiresIn: '12h' } // Thời gian hết hạn: 12 giờ
+              );
+
+              // Đăng nhập thành công, trả về thông tin helper kèm token
+              res.status(200).json({
+                message: 'Login successful',
+                token, // Trả về token
+                user: {
+                  UserID: helper.HelperID,
+                  Email: helper.Email,
+                  FullName: helper.HelperName,
+                  PhoneNumber: helper.Phone,
+                  Address: helper.Address,
+                  AvatarUrl: helper.IMG_Helper,
+                  Role: 'Helper',
+                },
+              });
+            });
+          }
+        );
+      }
+    }
+  );
+});
+
 // API Proxy để tải file PDF từ Google Drive
 app.get('/proxy', async (req, res) => {
   try {
@@ -679,7 +360,79 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
+app.get('/api/posts', (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 6;
+  const offset = (page - 1) * limit;
+
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM blog
+    INNER JOIN categories ON blog.CategoryID = categories.CategoryID
+  `;
+
+  const query = `
+    SELECT blog.*, categories.Name
+    FROM blog
+    INNER JOIN categories ON blog.CategoryID = categories.CategoryID
+    LIMIT ? OFFSET ?
+  `;
+
+  db.query(countQuery, (err, countResults) => {
+    if (err) {
+      console.log('Error counting blog posts:', err);
+      return res.status(500).json({ message: 'Error counting blog posts' });
+    }
+
+    const totalPosts = countResults[0].total;
+    const totalPages = Math.ceil(totalPosts / limit);
+
+    db.query(query, [limit, offset], (err, results) => {
+      if (err) {
+        console.log('Error retrieving blog posts:', err);
+        res.status(500).json({ message: 'Error retrieving blog posts' });
+      } else {
+        res.json({
+          posts: results,
+          pagination: {
+            currentPage: page,
+            totalPages: totalPages,
+            totalPosts: totalPosts,
+            postsPerPage: limit
+          }
+        });
+      }
+    });
+  });
+});
+
+// API lấy chi tiết một blog theo ID
+app.get('/api/posts/:id', (req, res) => {
+  const blogId = req.params.id;
+  const query = `
+    SELECT blog.*, categories.Name
+    FROM blog
+    INNER JOIN categories ON blog.CategoryID = categories.CategoryID
+    WHERE blog.BlogID = ?
+  `;
+  db.query(query, [blogId], (err, results) => {
+    if (err) {
+      console.log('Error retrieving blog post:', err);
+      res.status(500).json({ message: 'Error retrieving blog post' });
+    } else if (results.length === 0) {
+      console.log('Blog not found');
+      res.status(404).json({ message: 'Blog not found' });
+    } else {
+      res.json(results[0]);
+    }
+  });
+});
+
 // Khởi động server
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+// app.listen(port, () => {
+//   console.log(`Server running on http://localhost:${port}`);
+// });
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
 });

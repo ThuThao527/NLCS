@@ -7,7 +7,7 @@ import Review from './Review.vue';
     <div
       class="feedback d-flex flex-column align-items-center justify-content-center"
     >
-      <h1>WHAT OUR TRAVELERS SAY</h1>
+      <h1>Đánh giá của khách hàng</h1>
       <div class="stars row justify-content-center">
         <i class="fa-solid fa-star col-1"></i>
         <i class="fa-solid fa-star col-1"></i>
@@ -15,7 +15,7 @@ import Review from './Review.vue';
         <i class="fa-solid fa-star col-1"></i>
         <i class="fa-solid fa-star col-1"></i>
       </div>
-      <a href="/">READ OUR REVIEW ON FACEBOOK</a>
+      <a href="https://www.facebook.com/NgoThao2733/">Xem thên trên Facebook</a>
     </div>
     <div class="container-fluid">
       <!-- <h2>Recent feedback</h2> -->
@@ -27,7 +27,7 @@ import Review from './Review.vue';
 <style scoped>
 .feedback {
   padding: 50px 0;
-  background: linear-gradient(to bottom, #4f92bf, #b3d5ed);
+  background: linear-gradient(180deg,  rgb(187, 179, 162),  rgb(228, 219, 196));
   color: #fff;
 }
 
@@ -55,7 +55,7 @@ a:hover {
 }
 
 .container-fluid {
-  background-color: #b3d5ed;
+  background-color:  rgb(228, 219, 196);
   padding: 20px 0;
 }
 

@@ -8,23 +8,23 @@
     >
       <!-- Left Section -->
       <div
-        class="col-md-6 bg-primary text-white p-5 d-flex flex-column align-items-center justify-content-center"
+        class="col-md-6 bg-primary text-white p-5 d-flex flex-column align-items-center justify-content-center left-section"
       >
         <h1 class="fw-bold mb-4 text-center">
-          Learn From World’s <br />
-          Best Instructors 🌎 <br />
-          Around The World.
-        </h1>
+              Tìm Người Giúp Việc  <br/>
+      Nhanh Chóng, Dễ Dàng  <br/>
+      An Tâm Tuyệt Đối! 
+                </h1>
         <img
-          src="../assets/tree.png"
+          src="../assets/signin_image2.jpg"
           alt="Study Online"
           class="img-fluid"
-          style="max-height: 200px"
+          style="max-height: 1000px"
         />
       </div>
 
       <!-- Right Section -->
-      <div class="col-md-6 bg-white p-5">
+      <div class="col-md-6 bg-white p-5 right-section">
         <h3 class="fw-bold mb-4">
           {{ isLogin ? 'Sign In' : 'Create Account' }}
         </h3>
@@ -50,6 +50,8 @@
               required
             />
           </div>
+
+          <!-- Phone Number -->
           <div class="mb-3" v-if="!isLogin">
             <input
               v-model="PhoneNumber"
@@ -58,6 +60,33 @@
               placeholder="Phone Number"
               required
             />
+          </div>
+
+          <!-- Address -->
+          <div class="mb-3" v-if="!isLogin">
+            <input
+              v-model="Address"
+              type="text"
+              class="form-control"
+              placeholder="Address"
+              required
+            />
+          </div>
+
+          <!-- Role -->
+          <div class="mb-3" v-if="!isLogin">
+            <!-- <label for="role" class="form-label">Role</label> -->
+            <select
+              v-model="Role"
+              class="form-control"
+              id="role"
+              required
+            >
+              <option value="" disabled>Select your role</option>
+              <option value="Admin">Admin</option>
+              <option value="Customer">Customer</option>
+              <option value="Helper">Helper</option>
+            </select>
           </div>
 
           <!-- Password -->
@@ -103,16 +132,6 @@
           </button>
 
           <!-- Google Sign In -->
-          <!-- <div>
-            <div
-              id="g_id_onload"
-              :data-client_id="clientId"
-              :data-callback="handleCredentialResponse"
-              data-auto_prompt="true"
-            >
-              <div class="g_id_signin" data-type="standard"></div>
-            </div>
-          </div> -->
           <div id="buttonDiv"></div>
 
           <!-- Toggle Form -->
@@ -120,7 +139,7 @@
             {{
               isLogin ? "Don't have an account?" : 'Already have an account?'
             }}
-            <a href="#" class="text-decoration-none" @click="toggleForm">
+            <a href="#" class="text-decoration-none color-button" @click="toggleForm">
               {{ isLogin ? 'Sign Up' : 'Sign In' }}
             </a>
           </p>
@@ -133,22 +152,27 @@
 <script>
 import axios from 'axios';
 import { useRouter } from 'vue-router';
-const router = useRouter();
 
 export default {
   data() {
     return {
-      isLogin: true, // Toggle giữa Sign In và Sign Up
+      isLogin: true, // Mặc định là form Sign Up
       Email: '',
       Password: '',
       FullName: '',
       PhoneNumber: '',
+      Address: '', // Thêm trường Address
+      Role: '', // Trường Role
       confirmPassword: '',
       AvatarUrl:
         'https://i.pinimg.com/474x/93/75/ae/9375aef3b0ea35e0cf4ca12862bb5fef.jpg',
       clientId:
         '87667223869-08fsea38r378m40iqpfarbmdm6a7n9bl.apps.googleusercontent.com',
     };
+  },
+  setup() {
+    const router = useRouter();
+    return { router };
   },
   methods: {
     toggleForm() {
@@ -159,6 +183,10 @@ export default {
       this.Email = '';
       this.Password = '';
       this.FullName = '';
+      this.PhoneNumber = '';
+      this.Address = ''; // Xóa trường Address
+      this.Role = ''; // Xóa trường Role
+      this.confirmPassword = '';
     },
     async handleSubmit() {
       try {
@@ -171,21 +199,23 @@ export default {
           Email: this.Email,
           Password: this.Password,
           ...(this.isLogin ? {} : { FullName: this.FullName }),
-          AvatarUrl: this.AvatarUrl,
           ...(this.isLogin ? {} : { PhoneNumber: this.PhoneNumber }),
+          ...(this.isLogin ? {} : { Address: this.Address }), // Thêm Address vào payload
+          ...(this.isLogin ? {} : { Role: this.Role }), // Thêm Role vào payload
+          AvatarUrl: this.AvatarUrl,
         };
         console.log(payload);
         const response = await axios.post(endpoint, payload);
         alert(response.data.message);
 
-        if (!this.isLogin && response.status == 200) {
+        if (!this.isLogin && response.status === 201) {
           alert("Let's Sign In");
-          window.location.href = '/sign_in_and_out';
+          this.isLogin = true; // Chuyển sang form Sign In
         }
 
         if (response.data.user) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
-          this.$router.push('/');
+          this.router.push('/');
         }
       } catch (error) {
         alert('Error: ' + error.response.data.message);
@@ -193,40 +223,31 @@ export default {
     },
 
     async handleCredentialResponse(response) {
-      // console.log('Encoded JWT ID token: ' + response.credential);
-
       const data = this.parseJwt(response.credential);
 
       try {
         const response = await axios.post(
-          '/api/google-login', // URL của API
+          '/api/google-login',
           {
             FullName: data.name,
             Email: data.email,
+            PhoneNumber: 'N/A', // Giá trị mặc định cho Google Sign-In
+            Address: 'N/A', // Giá trị mặc định cho Google Sign-In
             AvatarUrl: data.picture,
+            Role: 'Customer', // Gán mặc định Role cho Google Sign-In
           },
           {
             headers: {
-              'Content-Type': 'application/json', // Đảm bảo header này
+              'Content-Type': 'application/json',
             },
           }
         );
 
-        // Lưu trữ thông tin người dùng vào localStorage
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        localStorage.setItem('authToken', response.data.token); // Lưu token nếu có (nếu bạn sử dụng JWT)
+        localStorage.setItem('authToken', response.data.token);
 
-        this.$router.push('/');
-        alert('Sign in successfull!');
-
-        // Kiểm tra nếu có phản hồi chuyển hướng (giống như fetch)
-        if (response.request.responseURL !== window.location.href) {
-          // Nếu có chuyển hướng, điều hướng đến URL mới
-          // window.location.href = response.request.responseURL;
-        } else {
-          // Nếu không có chuyển hướng, xử lý phản hồi bình thường
-          console.log('No redirection occurred');
-        }
+        this.router.push('/');
+        alert('Sign in successful!');
       } catch (error) {
         console.error('Error during the request:', error);
       }
@@ -244,7 +265,6 @@ export default {
     },
   },
   mounted() {
-    // Ensure the Google platform library is loaded before running
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
@@ -285,4 +305,42 @@ form {
   align-items: center;
   justify-content: center;
 }
+.fw-bold,
+.mb-4,
+.mb-3,
+.form-label {
+  color: #000 !important; /* Màu đen cho tất cả các phần tử */
+  /* transition: none !important; Loại bỏ hiệu ứng chuyển màu */
+}
+
+.left-section {
+  background-color: #ffffff !important; /* Màu nền xanh lá nhạt */
+  color: #000 !important; /* Màu chữ đen */
+}
+
+.right-section {
+  background-color: #c7e1e4 !important; /* Màu nền xám nhạt */
+}
+.btn-primary {
+  background-color: #88c7ce !important; /* Màu nền xanh lá cây */
+  color: #fff !important; /* Màu chữ trắng */
+  border: none; /* Bỏ viền (nếu có) */
+}
+
+.btn-primary:hover {
+  background-color: #5a8b90 !important; /* Màu nền khi hover */
+  color: #fff !important; /* Màu chữ khi hover */
+}
+
+.text-center{
+  color: #000000 !important;
+  text-shadow: none !important;
+}
+.left-section h1 {
+  font-size: 1.8rem; /* Tăng kích thước chữ */
+  /* font-weight: 700;  */
+  text-shadow: none !important;
+}
+
+
 </style>

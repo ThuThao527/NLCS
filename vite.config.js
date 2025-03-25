@@ -7,14 +7,15 @@ import vueDevTools from 'vite-plugin-vue-devtools';
 // https://vite.dev/config/
 export default defineConfig({
   server: {
+    port: 5174, // Đặt port trực tiếp trong server
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3000', // Chuyển hướng đến server
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path,
-      },
-    },
+        logLevel: 'debug'
+      }
+    }
   },
   plugins: [vue(), vueDevTools()],
   resolve: {

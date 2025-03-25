@@ -1,604 +1,530 @@
 <template>
-  <div class="createTour">
-    <h2 v-if="!editable" class="text-center">Create Tour</h2>
-    <h2 v-else class="text-center">Modify Tour</h2>
-    <form
-      id="form"
-      @submit.prevent="createTour(tourInf, dateForms, serviceForms, itinerary)"
-    >
-      <h4>Tour Infomation</h4>
-      <div class="tourInfo">
-        <div class="row">
-          <div class="col">
-            <label for="tourName" class="form-label">Name of tour</label>
-            <input
-              type="text"
-              id="tourName"
-              class="form-control"
-              placeholder="Your Anwer"
-              v-model="tourInf.TourName"
-              required
-            />
-          </div>
-          <div class="col mb-2">
-            <label for="tourimg" class="form-label">Image of tour</label>
-            <input
-              type="file"
-              id="tourimg"
-              class="form-control"
-              placeholder="Your Anwer"
-              required
-              @change="(event) => handleImage(event, props.tourInf, 'Img_Tour')"
-            />
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="row">
-              <div class="col">
-                <label for="price" class="form-label"> Price of tour </label>
-                <input
-                  type="number"
-                  id="price"
-                  min="0"
-                  class="form-control"
-                  v-model="tourInf.Price"
-                  required
-                  placeholder="$0"
-                />
-              </div>
-              <div class="col">
-                <label for="duration" class="form-label">Duration</label>
-                <input
-                  id="duration"
-                  type="text"
-                  min="0"
-                  class="form-control"
-                  placeholder="Ex: 7 days"
-                  required
-                  v-model="tourInf.Duration"
-                />
-              </div>
-            </div>
-
-            <!-- <div>
-              <label for="destination" class="form-label">Destination</label>
-              <input
-                type="text"
-                id="destination"
-                class="form-control"
-                placeholder="Your Answer"
-                required
-                v-model="tourInf.Destination"
-              />
-            </div> -->
-          </div>
-          <div class="col">
-            <img
-              class="rounded order-light-subtle"
-              :src="
-                tourInf.Img_Tour?.preview
-                  ? tourInf.Img_Tour.preview
-                  : tourInf.Img_Tour
-              "
-              alt="Image of Tour"
-              style="height: 200px; border-radius: 10px"
-            />
-          </div>
-        </div>
-        <div class="my-2">
-          <label for="description" class="form-label"
-            >Description of tour</label
+  <div class="calendar-container p-4 max-w-4xl mx-auto bg-white rounded-lg shadow">
+    <h1 class="text-2xl font-bold text-center mb-6">Schedule your availability</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Calendar Section (Left) -->
+      <div class="md:col-span-2">
+        <!-- Calendar header with navigation -->
+        <div class="flex justify-between items-center mb-4">
+          <button 
+            @click="previousMonth" 
+            class="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label="Previous month"
           >
-          <textarea
-            id="description"
-            class="form-control"
-            v-model="tourInf.Description"
-            placeholder="Description about some interesting of the tour"
-          ></textarea>
-        </div>
-      </div>
-      <hr />
-      <div class="itinerary">
-        <div class="d-flex">
-          <h4>Itinerary</h4>
-          <button
-            type="button"
-            id="btn"
-            class="btn btn-primary mx-3"
-            @click="addForm(props.itinerary)"
+            <ChevronLeft class="h-5 w-5" />
+          </button>
+          
+          <h2 class="text-xl font-semibold">
+            {{ currentMonthName }} {{ currentYear }}
+          </h2>
+          
+          <button 
+            @click="nextMonth" 
+            class="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label="Next month"
           >
-            Add More
+            <ChevronRight class="h-5 w-5" />
           </button>
         </div>
-
-        <div class="row my-3">
-          <div
-            v-for="(item, index) in props.itinerary"
-            :key="index"
-            class="col-lg-6 col-sm-12 mb-4"
+        
+        <!-- Days of week header -->
+        <div class="grid grid-cols-7 mb-2">
+          <div 
+            v-for="day in daysOfWeek" 
+            :key="day" 
+            class="text-center font-medium text-sm py-2"
           >
-            <div class="card p-3 shadow-sm">
-              <div class="d-flex">
-                <h5 class="text-primary mx-2">Day {{ item.DayNumber }}</h5>
-
-                <button
-                  type="button"
-                  class="btn btn-danger me-2 mx-5"
-                  @click="removeForm(props.itinerary, index)"
-                >
-                  Remove
-                </button>
+            {{ day }}
+          </div>
+        </div>
+        
+        <!-- Calendar grid with drag selection -->
+        <div 
+          class="grid grid-cols-7 gap-1"
+          @mouseup="handleDragEnd"
+          @mouseleave="handleDragEnd"
+          @touchend="handleDragEnd"
+        >
+          <div 
+            v-for="(day, index) in calendarDays" 
+            :key="index"
+            :class="[
+              'relative h-14 flex flex-col items-center justify-center rounded select-none',
+              day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400',
+              day.isToday ? 'bg-blue-50 font-bold' : '',
+              isDateSelected(day.date) ? 'bg-blue-100' : '',
+              'cursor-pointer transition-colors'
+            ]"
+            @mousedown="handleDragStart(day.date, $event)"
+            @mouseover="handleDragOver(day.date)"
+            @touchstart="handleDragStart(day.date, $event)"
+            @touchmove="handleTouchMove($event)"
+          >
+            <span :class="[
+              'flex items-center justify-center w-8 h-8 rounded-full',
+              isDateSelected(day.date) ? 'bg-blue-500 text-white' : ''
+            ]">
+              {{ day.dayNumber }}
+            </span>
+            
+            <!-- Shift indicators -->
+            <div v-if="getShiftsForDate(day.date).length > 0" class="absolute bottom-0 w-full flex flex-col gap-0.5 mt-1">
+              <div v-if="isFullDayShift(day.date)" 
+                class="text-xs mx-auto text-center px-1 py-0.5 rounded-sm font-medium bg-green-200 text-green-800">
+                Full Day
               </div>
-
-              <div class="row">
-                <div class="col-md-6">
-                  <label class="form-label">Day Number</label>
-                  <input
-                    type="number"
-                    min="0"
-                    :max="tourInf?.Duration"
-                    required
-                    class="form-control"
-                    v-model="item.DayNumber"
-                  />
-                </div>
-
-                <div class="col-md-6">
-                  <label class="form-label">Image</label>
-                  <input
-                    type="file"
-                    id="tourimg"
-                    class="form-control"
-                    required
-                    placeholder="Your Anwer"
-                    @change="(event) => handleImage(event, item, 'ImageUrl')"
-                  />
-                </div>
-                <div class="row">
-                  <div class="col">
-                    <div class="mt-2">
-                      <label class="form-label">Meals Included</label>
-                      <input
-                        type="text"
-                        class="form-control"
-                        v-model="item.MealsIncluded"
-                      />
-                    </div>
-
-                    <div class="mt-2">
-                      <label class="form-label">Activities</label>
-                      <input
-                        type="text"
-                        class="form-control"
-                        required
-                        rows="2"
-                        v-model="item.Activities"
-                      />
-                    </div>
-
-                    <div class="mt-2">
-                      <label class="form-label">Location</label>
-                      <input
-                        type="text"
-                        required
-                        class="form-control"
-                        v-model="item.Location"
-                      />
-                    </div>
-                  </div>
-                  <div class="col">
-                    <img
-                      :src="
-                        item.ImageUrl?.preview
-                          ? item.ImageUrl.preview
-                          : item.ImageUrl
-                      "
-                      alt=""
-                      style="width: 250px; border-radius: 5px; margin: 5px"
-                    />
-                  </div>
-                </div>
-
-                <div class="col-md-12 mt-2">
-                  <label class="form-label">Description</label>
-                  <textarea
-                    type="text"
-                    class="form-control"
-                    v-model="item.Description"
-                  ></textarea>
+              <div v-else class="flex justify-center gap-1">
+                <div 
+                  v-for="shift in getShiftsForDate(day.date)" 
+                  :key="shift"
+                  class="text-xs px-1 py-0.5 rounded-sm font-medium"
+                  :class="{
+                    'bg-blue-200 text-blue-800': shift === 'shift1',
+                    'bg-purple-200 text-purple-800': shift === 'shift2',
+                    'bg-amber-200 text-amber-800': shift === 'shift3'
+                  }"
+                >
+                  {{ shift === 'shift1' ? 'S1' : shift === 'shift2' ? 'S2' : 'S3' }}
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+        
+        <!-- Selected dates summary -->
+        <div v-if="selectedDates.length > 0" class="mt-4 pt-4 border-t">
+          <div class="flex justify-between items-center mb-2">
+            <div class="font-medium">Selected Dates ({{ selectedDates.length }}):</div>
+            <button 
+              @click="clearSelection" 
+              class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm transition-colors"
+            >
+              Clear Selection
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <span 
+              v-for="(date, index) in sortedSelectedDates" 
+              :key="index"
+              class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+            >
+              {{ formatDateShort(date) }}
+            </span>
           </div>
         </div>
       </div>
-
-      <hr />
-      <div class="tourSchedule my-3">
-        <div class="d-flex">
-          <h4>Tour Schedule</h4>
-          <button
-            style="max-width: 200px"
-            type="button"
-            class="btn btn-primary mx-3"
-            @click="addForm(props.dateForms)"
-          >
-            Add More
-          </button>
-        </div>
-
-        <div class="row my-3">
-          <div
-            v-for="(form, index) in props.dateForms"
-            :key="index"
-            class="mb-3 col-lg-3 col-sm-12"
-          >
-            <div class="d-flex">
-              <div>
-                <VDatePicker
-                  v-model="form.date"
-                  timezone="UTC"
-                  :min-date="new Date()"
-                  :color="selectedColor"
-                  borderless
-                  is-required
-                >
-                  <template #default="{ inputValue, inputEvents }">
-                    <div
-                      class="d-flex justify-content-center align-items-center"
-                    >
-                      <div class="input-group mb-3">
-                        <span class="input-group-text">Start</span>
-                        <input
-                          :value="inputValue"
-                          v-on="inputEvents"
-                          type="text"
-                          class="form-control"
-                        />
-                      </div>
-                    </div>
-                  </template>
-                </VDatePicker>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-5">
-                <label for="capacity" class="form-label">Capacity</label>
-                <input
-                  type="number"
-                  class="form-control"
-                  min="0"
-                  id="capacity"
-                  v-model="form.Capacity"
-                  required
-                />
-              </div>
-              <div
-                class="col-1 d-flex justify-content-start align-items-end p-0"
+      
+      <!-- Shift Selection Section (Right) -->
+      <div class="bg-gray-50 p-4 rounded-lg">
+        <h3 class="text-lg font-semibold mb-4">Working Shifts</h3>
+        
+        <div class="space-y-3">
+          <!-- Regular shifts (checkboxes) -->
+          <div class="space-y-2 mb-4">
+            <label 
+              class="flex items-center p-3 border rounded cursor-pointer transition-colors"
+              :class="{ 
+                'bg-white border-gray-300 hover:bg-gray-50': !selectedShifts.includes('shift1'),
+                'bg-blue-50 border-blue-300': selectedShifts.includes('shift1')
+              }"
+            >
+              <input 
+                type="checkbox" 
+                value="shift1" 
+                v-model="selectedShifts"
+                class="mr-3"
+                :disabled="selectedDates.length === 0 || isFullDaySelected"
+                @change="handleShiftSelection"
               >
-                <button
-                  type="button"
-                  class="btn btn-danger me-2"
-                  @click="removeForm(props.dateForms, index)"
-                >
-                  Remove
-                </button>
+              <div>
+                <div class="font-medium">Shift 1</div>
+                <div class="text-sm text-gray-500">Morning shift (8am - 11am)</div>
               </div>
-            </div>
+            </label>
+            
+            <label 
+              class="flex items-center p-3 border rounded cursor-pointer transition-colors"
+              :class="{ 
+                'bg-white border-gray-300 hover:bg-gray-50': !selectedShifts.includes('shift2'),
+                'bg-purple-50 border-purple-300': selectedShifts.includes('shift2')
+              }"
+            >
+              <input 
+                type="checkbox" 
+                value="shift2" 
+                v-model="selectedShifts"
+                class="mr-3"
+                :disabled="selectedDates.length === 0 || isFullDaySelected"
+                @change="handleShiftSelection"
+              >
+              <div>
+                <div class="font-medium">Shift 2</div>
+                <div class="text-sm text-gray-500">Afternoon shift (12pm - 3pm)</div>
+              </div>
+            </label>
+            
+            <label 
+              class="flex items-center p-3 border rounded cursor-pointer transition-colors"
+              :class="{ 
+                'bg-white border-gray-300 hover:bg-gray-50': !selectedShifts.includes('shift3'),
+                'bg-amber-50 border-amber-300': selectedShifts.includes('shift3')
+              }"
+            >
+              <input 
+                type="checkbox" 
+                value="shift3" 
+                v-model="selectedShifts"
+                class="mr-3"
+                :disabled="selectedDates.length === 0 || isFullDaySelected"
+                @change="handleShiftSelection"
+              >
+              <div>
+                <div class="font-medium">Shift 3</div>
+                <div class="text-sm text-gray-500">Evening shift (4pm - 7pm)</div>
+              </div>
+            </label>
+          </div>
+          
+          <!-- Full day option (radio) -->
+          <div class="pt-2 border-t">
+            <label 
+              class="flex items-center p-3 border rounded cursor-pointer transition-colors"
+              :class="{ 
+                'bg-white border-gray-300 hover:bg-gray-50': !isFullDaySelected,
+                'bg-green-50 border-green-300': isFullDaySelected
+              }"
+            >
+              <input 
+                type="checkbox" 
+                v-model="isFullDaySelected"
+                class="mr-3"
+                :disabled="selectedDates.length === 0"
+                @change="handleFullDaySelection"
+              >
+              <div>
+                <div class="font-medium">Full Day</div>
+                <div class="text-sm text-gray-500">Complete day (8am - 7pm)</div>
+              </div>
+            </label>
           </div>
         </div>
-        <hr />
-      </div>
-
-      <div class="tourServices">
-        <div class="d-flex">
-          <h4>Tour Services</h4>
-          <button
-            type="button"
-            id="btn"
-            class="btn btn-primary mx-3"
-            @click="addForm(props.serviceForms)"
-          >
-            Add More
-          </button>
+        
+        <!-- Selection info message -->
+        <div class="mt-4 text-sm text-gray-600 italic">
+          <p v-if="isFullDaySelected">Full Day cannot be combined with other shifts.</p>
+          <p v-else>You can select up to 2 shifts (Shift 1, 2, or 3).</p>
         </div>
-        <div class="row my-3">
-          <div
-            v-for="(service, index) in props.serviceForms"
-            :key="index"
-            class="col-lg-6 col-sm-12 my-2"
-          >
-            <div>
-              <div class="row">
-                <div class="col">
-                  <label for="servicename" class="form-label"
-                    >Service Name</label
-                  >
-                  <select
-                    v-model="service.ServiceID"
-                    class="form-select"
-                    id="servicename"
-                  >
-                    <option
-                      v-for="ser in services.filter(
-                        (service) => service.IsDeleted == 0
-                      )"
-                      :key="ser.ServiceID"
-                      :value="ser.ServiceID"
-                    >
-                      {{ ser.ServiceName }}
-                    </option>
-                  </select>
-                </div>
-                <div class="col-3">
-                  <label for="status" class="form-label">Status</label>
-                  <select
-                    required
-                    class="form-select"
-                    aria-label="Default select example"
-                    v-model="service.Status"
-                  >
-                    <option value="Available">Available</option>
-                    <option value="Optional">Optional</option>
-                  </select>
-                </div>
-              </div>
-              <div class="row my-2">
-                <div class="col-3">
-                  <label for="availableSpot" class="form-label">Capacity</label>
-                  <input
-                    type="number"
-                    class="form-control"
-                    required
-                    min="0"
-                    placeholder="Your Answer"
-                    id="availableSpot"
-                    v-model="service.Capacity"
-                  />
-                </div>
-                <div
-                  class="col-1 d-flex justify-content-start align-items-end p-0"
-                >
-                  <button
-                    type="button"
-                    class="btn btn-danger me-2"
-                    @click="removeForm(props.serviceForms, index)"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="!editable" class="text-end">
-        <button type="submit" class="btn btn-primary btn-block my-3">
-          Create Tour
+        
+        <button 
+          @click="applyShiftsToSelectedDates" 
+          class="mt-4 w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="selectedDates.length === 0 || (!isFullDaySelected && selectedShifts.length === 0)"
+        >
+          Apply to Selected Dates
         </button>
+        
+        <!-- Saved shifts summary -->
+        <div v-if="Object.keys(dateShifts).length > 0" class="mt-6 pt-4 border-t">
+          <h4 class="font-medium mb-2">Saved Shifts:</h4>
+          <div class="space-y-2 max-h-60 overflow-y-auto">
+            <div 
+              v-for="(shifts, dateString) in dateShifts" 
+              :key="dateString"
+              class="flex justify-between items-center p-2 bg-white rounded border"
+            >
+              <div>
+                <div class="font-medium">{{ formatDateShort(new Date(dateString)) }}</div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <span 
+                    v-if="shifts.includes('full')"
+                    class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800"
+                  >
+                    Full Day
+                  </span>
+                  <template v-else>
+                    <span 
+                      v-for="shift in shifts" 
+                      :key="shift"
+                      class="text-xs px-2 py-0.5 rounded-full"
+                      :class="{
+                        'bg-blue-100 text-blue-800': shift === 'shift1',
+                        'bg-purple-100 text-purple-800': shift === 'shift2',
+                        'bg-amber-100 text-amber-800': shift === 'shift3'
+                      }"
+                    >
+                      {{ shift === 'shift1' ? 'Shift 1' : shift === 'shift2' ? 'Shift 2' : 'Shift 3' }}
+                    </span>
+                  </template>
+                </div>
+              </div>
+              <button 
+                @click="removeDateShift(dateString)" 
+                class="text-gray-500 hover:text-red-500"
+              >
+                <X class="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </form>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
-import { useScreens } from 'vue-screen-utils';
-import TourSection from './TourSection.vue';
-import axios from 'axios';
-import { format } from 'date-fns';
+import { ref, computed } from 'vue';
+import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 
-const services = ref([]); // Lưu các services của tour
+// State
+const today = new Date();
+const currentMonth = ref(today.getMonth());
+const currentYear = ref(today.getFullYear());
+const selectedDates = ref([]);
+const isDragging = ref(false);
+const dragStartDate = ref(null);
+const lastTouchedDate = ref(null);
+const selectedShifts = ref([]);
+const isFullDaySelected = ref(false);
+const dateShifts = ref({});  // Object to store date -> shifts array mappings
 
-const { mapCurrent } = useScreens({
-  xs: '0px',
-  sm: '640px',
-  md: '768px',
-  lg: '1024px',
+// Days of week
+const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Computed properties
+const currentMonthName = computed(() => {
+  return new Date(currentYear.value, currentMonth.value, 1).toLocaleString('default', { month: 'long' });
 });
 
-const selectedColor = ref('blue');
-
-const props = defineProps({
-  dateForms: reactive([{ date: null, Capacity: '' }]),
-  serviceForms: reactive([{}]),
-  tourInf: reactive({
-    TourName: '',
-    Description: '',
-    Price: '',
-    Img_Tour: new FormData(),
-    Duration: '',
-  }),
-  itinerary: reactive([{}]),
-  editable: false,
+const calendarDays = computed(() => {
+  const days = [];
+  const firstDayOfMonth = new Date(currentYear.value, currentMonth.value, 1);
+  const lastDayOfMonth = new Date(currentYear.value, currentMonth.value + 1, 0);
+  
+  // Get the day of the week for the first day (0-6, where 0 is Sunday)
+  const firstDayOfWeek = firstDayOfMonth.getDay();
+  
+  // Add days from previous month
+  const prevMonthLastDay = new Date(currentYear.value, currentMonth.value, 0).getDate();
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    const date = new Date(currentYear.value, currentMonth.value - 1, prevMonthLastDay - firstDayOfWeek + i + 1);
+    days.push({
+      date,
+      dayNumber: date.getDate(),
+      isCurrentMonth: false,
+      isToday: isSameDay(date, today)
+    });
+  }
+  
+  // Add days of current month
+  for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+    const date = new Date(currentYear.value, currentMonth.value, i);
+    days.push({
+      date,
+      dayNumber: i,
+      isCurrentMonth: true,
+      isToday: isSameDay(date, today)
+    });
+  }
+  
+  // Add days from next month to complete the grid
+  const remainingDays = 42 - days.length; // 6 rows of 7 days
+  for (let i = 1; i <= remainingDays; i++) {
+    const date = new Date(currentYear.value, currentMonth.value + 1, i);
+    days.push({
+      date,
+      dayNumber: i,
+      isCurrentMonth: false,
+      isToday: false
+    });
+  }
+  
+  return days;
 });
 
-const isObjectEmpty = (obj) => {
-  return Object.keys(obj).length === 0 && obj.constructor === Object;
-};
+const sortedSelectedDates = computed(() => {
+  return [...selectedDates.value].sort((a, b) => a - b);
+});
 
-const addForm = (form) => {
-  console.log(form.length);
-  if (form.length === 0 || !isObjectEmpty(form[form.length - 1])) {
-    console.log(form);
-    form.push({}); // Thêm đối tượng mới vào mảng
+// Methods
+function previousMonth() {
+  if (currentMonth.value === 0) {
+    currentMonth.value = 11;
+    currentYear.value--;
+  } else {
+    currentMonth.value--;
   }
-};
+}
 
-// Hàm xóa form
-const removeForm = (form, index) => {
-  console.log(index);
-  console.log(form[index]);
-
-  // Xóa phần tử tại vị trí index
-  form.splice(index, 1);
-  console.log(form);
-
-  // Kiểm tra nếu phần tử cuối cùng là rỗng thì xóa
-  if (isObjectEmpty(form[form.length - 1])) {
-    form.pop();
-    console.log('Đã xóa phần tử rỗng cuối cùng:', form);
+function nextMonth() {
+  if (currentMonth.value === 11) {
+    currentMonth.value = 0;
+    currentYear.value++;
+  } else {
+    currentMonth.value++;
   }
-};
+}
 
-// const handleImage = (event, targetObject, imageKey) => {
-//   const file = event.target.files[0];
-//   if (file) {
-//     const reader = new FileReader();
-//     reader.readAsDataURL(file); // Chuyển đổi file sang Base64
+function handleDragStart(date, event) {
+  // Prevent default to avoid text selection during drag
+  event.preventDefault();
+  
+  isDragging.value = true;
+  dragStartDate.value = new Date(date);
+  lastTouchedDate.value = new Date(date);
+  
+  // Toggle selection of the first date
+  toggleDateSelection(date);
+}
 
-//     reader.onload = () => {
-//       targetObject[imageKey] = reader.result; // Gán giá trị Base64 vào key tương ứng
-//       console.log(`Image uploaded for ${imageKey}:`, reader.result);
-//     };
-
-//     reader.onerror = (error) => {
-//       console.error('Lỗi khi đọc file:', error);
-//     };
-//   }
-// };
-
-const handleImage = (event, targetObject, imageKey) => {
-  const file = event.target.files[0];
-
-  if (file) {
-    // Tạo URL preview
-    const objectUrl = URL.createObjectURL(file);
-
-    // Lưu cả file và preview URL
-    targetObject[imageKey] = {
-      file,
-      preview: objectUrl,
-    };
-    console.log(targetObject[imageKey]);
+function handleDragOver(date) {
+  if (!isDragging.value) return;
+  
+  const currentDate = new Date(date);
+  
+  // If we're dragging over a new date
+  if (!isSameDay(currentDate, lastTouchedDate.value)) {
+    lastTouchedDate.value = currentDate;
+    
+    // Select all dates between drag start and current
+    selectDateRange(dragStartDate.value, currentDate);
   }
-};
+}
 
-const uploadImage = async (file) => {
-  const formData = new FormData();
-  formData.append('image', file); // Append File object vào FormData
-
-  try {
-    const response = await axios.post('/api/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data', // Bắt buộc phải có header này
-      },
-    });
-    return response.data.imageUrl;
-  } catch (error) {
-    console.error('Lỗi upload ảnh:', error);
-    throw error;
-  }
-};
-
-const createTour = async (tourInf, dateForms, serviceForms, itinerary) => {
-  try {
-    // tiền xử lý
-    //xử lý ảnh
-    const [mainImage, ...itineraryResults] = await Promise.all([
-      uploadImage(tourInf.Img_Tour.file).catch((error) => {
-        console.error('Lỗi upload ảnh chính:', error);
-        return null;
-      }),
-      ...itinerary.map((item, index) =>
-        item.ImageUrl?.file
-          ? uploadImage(item.ImageUrl.file).catch((error) => {
-              console.error(`Lỗi upload ảnh ngày ${index + 1}:`, error);
-              return null;
-            })
-          : Promise.resolve(null)
-      ),
-    ]);
-
-    // Gán kết quả
-    console.log(mainImage, itineraryResults);
-    tourInf.Img_Tour = mainImage || '';
-    itinerary.forEach((item, index) => {
-      item.ImageUrl = itineraryResults[index] || '';
-    });
-    // Xử lý form date
-    dateForms.map((date) => {
-      console.log(date.date);
-      date.date = format(new Date(date.date), 'yyyy-MM-dd HH:mm:ss');
-    });
-
-    const confirm = window.confirm('Are you sure you want to create new tour?');
-    if (!confirm) {
-      return;
-    } else {
-      console.log(tourInf, dateForms, serviceForms, itinerary);
-      const response = await axios.post('/api/create_tour', {
-        tourInf,
-        dateForms,
-        serviceForms,
-        itinerary,
-      });
-      if (response.status != 200) {
-        alert(response.data.message);
-      }
-      alert('Create Tour Successfully');
-      location.reload();
+function handleTouchMove(event) {
+  if (!isDragging.value) return;
+  
+  // Get the element under the touch point
+  const touch = event.touches[0];
+  const element = document.elementFromPoint(touch.clientX, touch.clientY);
+  
+  // Find the calendar day element
+  const dayElement = element?.closest('.grid-cols-7 > div');
+  if (dayElement) {
+    // Get the index of the day element
+    const dayElements = Array.from(dayElement.parentElement.children);
+    const index = dayElements.indexOf(dayElement);
+    
+    if (index >= 0 && index < calendarDays.value.length) {
+      handleDragOver(calendarDays.value[index].date);
     }
-  } catch (error) {
-    alert('Error Create Tour');
-    console.error('Lỗi khi tạo tour:', error);
   }
-};
+}
 
-const fetchTourService = async () => {
-  try {
-    const response = await axios.get(`/api/services`);
-    console.log(response.data);
-    services.value = response.data;
-  } catch (error) {
-    console.error('Error fetching Tour Detail:', error);
+function handleDragEnd() {
+  isDragging.value = false;
+}
+
+function selectDateRange(startDate, endDate) {
+  // Clear previous selection
+  selectedDates.value = [];
+  
+  // Ensure startDate is before endDate
+  let start = new Date(Math.min(startDate, endDate));
+  let end = new Date(Math.max(startDate, endDate));
+  
+  // Add all dates in the range
+  let current = new Date(start);
+  while (current <= end) {
+    addDateToSelection(new Date(current));
+    current.setDate(current.getDate() + 1);
   }
-};
+}
 
-onMounted(() => {
-  fetchTourService();
-});
+function toggleDateSelection(date) {
+  const index = selectedDates.value.findIndex(d => isSameDay(d, date));
+  
+  if (index >= 0) {
+    // Date is already selected, remove it
+    selectedDates.value.splice(index, 1);
+  } else {
+    // Date is not selected, add it
+    addDateToSelection(date);
+  }
+}
+
+function addDateToSelection(date) {
+  // Only add if not already in the selection
+  if (!selectedDates.value.some(d => isSameDay(d, date))) {
+    selectedDates.value.push(new Date(date));
+  }
+}
+
+function isDateSelected(date) {
+  return selectedDates.value.some(d => isSameDay(d, date));
+}
+
+function clearSelection() {
+  selectedDates.value = [];
+  selectedShifts.value = [];
+  isFullDaySelected.value = false;
+}
+
+function handleShiftSelection() {
+  // Limit to 2 shifts maximum
+  if (selectedShifts.value.length > 2) {
+    selectedShifts.value = selectedShifts.value.slice(0, 2);
+  }
+  
+  // If any shift is selected, ensure full day is deselected
+  if (selectedShifts.value.length > 0) {
+    isFullDaySelected.value = false;
+  }
+}
+
+function handleFullDaySelection() {
+  // If full day is selected, clear other shifts
+  if (isFullDaySelected.value) {
+    selectedShifts.value = [];
+  }
+}
+
+function applyShiftsToSelectedDates() {
+  if (selectedDates.value.length === 0) return;
+  if (!isFullDaySelected.value && selectedShifts.value.length === 0) return;
+  
+  // Apply the selected shifts to all selected dates
+  selectedDates.value.forEach(date => {
+    const dateString = date.toISOString().split('T')[0];
+    if (isFullDaySelected.value) {
+      dateShifts.value[dateString] = ['full'];
+    } else {
+      dateShifts.value[dateString] = [...selectedShifts.value];
+    }
+  });
+  
+  // Clear the selection after applying
+  selectedDates.value = [];
+  selectedShifts.value = [];
+  isFullDaySelected.value = false;
+}
+
+function getShiftsForDate(date) {
+  const dateString = date.toISOString().split('T')[0];
+  return dateShifts.value[dateString] || [];
+}
+
+function isFullDayShift(date) {
+  const shifts = getShiftsForDate(date);
+  return shifts.includes('full');
+}
+
+function removeDateShift(dateString) {
+  const newDateShifts = { ...dateShifts.value };
+  delete newDateShifts[dateString];
+  dateShifts.value = newDateShifts;
+}
+
+function isSameDay(date1, date2) {
+  return date1.getDate() === date2.getDate() && 
+         date1.getMonth() === date2.getMonth() && 
+         date1.getFullYear() === date2.getFullYear();
+}
+
+function formatDateShort(date) {
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  });
+}
 </script>
-<style scoped>
-.adminTour {
-  padding: 0 20px;
-  background-color: #f5f7f8;
-}
-/* .form-control:invalid {
-  border-color: red;
-} */
-
-.adminTour {
-  overflow-y: auto; /* Hiển thị thanh cuộn dọc */
-  overflow-x: hidden; /* Ẩn thanh cuộn ngang */
-}
-
-/* Tùy chỉnh thanh cuộn */
-.adminTour::-webkit-scrollbar {
-  width: 8px; /* Chiều rộng của thanh cuộn dọc */
-}
-
-.adminTour::-webkit-scrollbar-thumb {
-  background-color: #888; /* Màu của thanh cuộn */
-  border-radius: 4px; /* Bo góc thanh cuộn */
-}
-
-.adminTour::-webkit-scrollbar-thumb:hover {
-  background-color: #555; /* Màu của thanh cuộn khi hover */
-}
-
-.adminTour::-webkit-scrollbar-track {
-  background: #f1f1f1; /* Màu nền của thanh cuộn */
-}
-
-#btn {
-  margin-top: auto;
-}
-
-.breadcrumb .active {
-  color: blue;
-}
-</style>

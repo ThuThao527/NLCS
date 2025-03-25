@@ -11,14 +11,14 @@
           :class="{ active: currentStep === 2 }"
           @click="goNext"
         >
-          <h4>List Tour</h4>
+          <h4>Thông tin cá nhân</h4>
         </li>
         <li
           class="breadcrumb-item px-2 rounded"
           :class="{ active: currentStep === 1 }"
           @click="goBack"
         >
-          <h4 style="width: 300px">Create Tour</h4>
+          <h4 style="width: 300px">Lịch làm</h4>
         </li>
       </ol>
     </nav>
@@ -30,7 +30,7 @@
         :serviceForms="serviceForms"
       ></CreateTour>
     </div>
-    <div v-if="currentStep == 2" class="listTour">
+    <div v-if="currentStep == 2" class="listlist">
       <TourSection></TourSection>
     </div>
   </div>
@@ -65,7 +65,7 @@ const tourInf = reactive({
 <style scoped>
 .adminTour {
   padding: 0 20px;
-  background-color: #f5f7f8;
+  background-color: #8cbbd3;
 }
 /* .form-control:invalid {
   border-color: red;

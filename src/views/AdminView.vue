@@ -1,6 +1,6 @@
 <template>
   <div class="adminView">
-    <!-- <AdminNavigate></AdminNavigate> -->
+    <!-- <AdminNavigate></AdminNavigate>  -->
     <AdminTourView></AdminTourView>
   </div>
 </template>

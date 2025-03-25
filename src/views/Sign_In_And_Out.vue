@@ -8,31 +8,42 @@
     >
       <!-- Left Section -->
       <div
-        class="col-md-6 bg-primary text-white p-5 d-flex flex-column align-items-center justify-content-center"
+        class="col-md-6 bg-primary text-white p-5 d-flex flex-column align-items-center justify-content-center left-section"
       >
         <h1 class="fw-bold mb-4 text-center">
-          Learn From World’s <br />
-          Best Instructors 🌎 <br />
-          Around The World.
-        </h1>
+        Tham Gia Ngay Hôm Nay <br />
+          Tìm Việc Làm Dễ Dàng <br />
+          Thu Nhập Ổn Định! 🏠
+                </h1>
         <img
-          src="../assets/tree.png"
+          src="../assets/signin_image_admin2.jpg"
           alt="Study Online"
           class="img-fluid"
-          style="max-height: 200px"
+          style="max-height: 400px"
         />
       </div>
 
       <!-- Right Section -->
-      <div class="col-md-6 bg-white p-5">
+      <div class="col-md-6 bg-white p-5 right-section">
         <h3 class="fw-bold mb-4">
           {{ isLogin ? 'Sign In' : 'Create Account' }}
         </h3>
         <form @submit.prevent="handleSubmit">
+          <!-- Full Name -->
+          <div class="mb-3" v-if="!isLogin">
+            <input
+              v-model="FullName"
+              type="text"
+              class="form-control"
+              placeholder="Full Name"
+              required
+            />
+          </div>
+
           <!-- Email -->
           <div class="mb-3">
             <input
-              v-model="email"
+              v-model="Email"
               type="email"
               class="form-control"
               placeholder="Email Address"
@@ -40,10 +51,48 @@
             />
           </div>
 
+          <!-- Phone Number -->
+          <div class="mb-3" v-if="!isLogin">
+            <input
+              v-model="PhoneNumber"
+              type="text"
+              class="form-control"
+              placeholder="Phone Number"
+              required
+            />
+          </div>
+
+          <!-- Address -->
+          <div class="mb-3" v-if="!isLogin">
+            <input
+              v-model="Address"
+              type="text"
+              class="form-control"
+              placeholder="Address"
+              required
+            />
+          </div>
+
+          <!-- Role -->
+          <div class="mb-3" v-if="!isLogin">
+            <!-- <label for="role" class="form-label">Role</label> -->
+            <select
+              v-model="Role"
+              class="form-control"
+              id="role"
+              required
+            >
+              <option value="" disabled>Select your role</option>
+              <option value="Admin">Admin</option>
+              <option value="Customer">Customer</option>
+              <option value="Helper">Helper</option>
+            </select>
+          </div>
+
           <!-- Password -->
           <div class="mb-3 position-relative">
             <input
-              v-model="password"
+              v-model="Password"
               type="password"
               class="form-control"
               placeholder="Password"
@@ -51,55 +100,210 @@
             />
           </div>
 
+          <!-- Confirm Password -->
+          <div class="mb-3" v-if="!isLogin">
+            <input
+              v-model="confirmPassword"
+              type="password"
+              class="form-control"
+              placeholder="Confirm Password"
+              required
+            />
+          </div>
+
+          <!-- Terms & Conditions -->
+          <div class="form-check mb-3" v-if="!isLogin">
+            <input
+              type="checkbox"
+              class="form-check-input"
+              id="terms"
+              required
+            />
+            <label class="form-check-label" for="terms">
+              I agree to the
+              <a href="#" class="text-decoration-none">terms of service</a> and
+              <a href="#" class="text-decoration-none">privacy policy</a>.
+            </label>
+          </div>
+
           <!-- Submit Button -->
           <button type="submit" class="btn btn-primary w-100 mb-3">
-            Sign In
+            {{ isLogin ? 'Sign In' : 'Sign Up' }}
           </button>
+
+          <!-- Google Sign In -->
+          <div id="buttonDiv"></div>
+
+          <!-- Toggle Form -->
+          <p class="text-center">
+            {{
+              isLogin ? "Don't have an account?" : 'Already have an account?'
+            }}
+            <a href="#" class="text-decoration-none color-button" @click="toggleForm">
+              {{ isLogin ? 'Sign Up' : 'Sign In' }}
+            </a>
+          </p>
         </form>
       </div>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue';
+<script>
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 
-const router = useRouter();
-
-// Reactive variables
-const isLogin = ref(true); // Toggle between Sign In and Sign Up
-const email = ref('');
-const password = ref('');
-const name = ref('');
-const avatarurl = ref(
-  'https://i.pinimg.com/736x/f5/fd/14/f5fd146c41549072d5a7823e31ea8eae.jpg'
-);
-
-const handleSubmit = async () => {
-  console.log(email.value);
-  try {
-    const payload = {
-      Email: email.value,
-      Password: password.value,
+export default {
+  data() {
+    return {
+      isLogin: true, // Mặc định là form Sign Up
+      Email: '',
+      Password: '',
+      FullName: '',
+      PhoneNumber: '',
+      Address: '', // Thêm trường Address
+      Role: '', // Trường Role
+      confirmPassword: '',
+      AvatarUrl:
+        'https://i.pinimg.com/474x/93/75/ae/9375aef3b0ea35e0cf4ca12862bb5fef.jpg',
+      clientId:
+        '670067480853-d1603i5t2felgj6kdgh3bagbrsgca5i3.apps.googleusercontent.com',
     };
+  },
+  setup() {
+    const router = useRouter();
+    return { router };
+  },
+  methods: {
+    toggleForm() {
+      this.isLogin = !this.isLogin; // Chuyển đổi form
+      this.clearForm();
+    },
+    clearForm() {
+      this.Email = '';
+      this.Password = '';
+      this.FullName = '';
+      this.PhoneNumber = '';
+      this.Address = ''; // Xóa trường Address
+      this.Role = ''; // Xóa trường Role
+      this.confirmPassword = '';
+    },
+    async handleSubmit() {
+      try {
+        console.log('Role:', this.Role);
+        
+        if (!this.isLogin && this.Password !== this.confirmPassword) {
+          alert('Passwords do not match.');
+          return;
+        }
+        const endpoint = this.isLogin ? '/api/login' : '/api/register';
+        const payload = {
+          Email: this.Email,
+          Password: this.Password,
+          ...(this.isLogin ? {} : { FullName: this.FullName }),
+          ...(this.isLogin ? {} : { PhoneNumber: this.PhoneNumber }),
+          ...(this.isLogin ? {} : { Address: this.Address }), // Thêm Address vào payload
+          ...(this.isLogin ? {} : { Role: this.Role }), // Thêm Role vào payload
+          AvatarUrl: this.AvatarUrl,
+        };
+        console.log(payload);
+        const response = await axios.post(endpoint, payload);
+        alert(response.data.message);
 
-    const response = await axios.post('/api/login/admin', payload);
-    if (response.data.user) {
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      router.push('/');
-      location.reload();
+        if (!this.isLogin && response.status === 201) {
+          alert("Let's Sign In");
+          this.isLogin = true; // Chuyển sang form Sign In
+        }
 
-      alert(response.data.message);
-    }
-  } catch (error) {
-    alert('Error: ' + error.response.data.message);
-  }
+        console.log('API Response:', response.data);
+        console.log('Current route:', this.$route.path); // Log route hiện tại
+        console.log('API Response:', response.data);
+
+        if (response.data.user) {
+          localStorage.setItem('token', response.data.token);
+          console.log('Saving user to localStorage:', response.data.user);
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          console.log('User saved to localStorage');
+          console.log('Redirecting to /');
+
+          this.router.push('/');
+
+          alert(response.data.message);
+        } else {
+          console.log('User not found in response');
+          alert('Error: User data not found in response');
+        }
+      } catch (error) {
+        console.error('Error:', error.response); // In toàn bộ phản hồi lỗi
+        if (error.response && error.response.data && error.response.data.message) {
+          alert('Error: ' + error.response.data.message);
+        } else {
+          alert('Error: Something went wrong. Please try again.');
+        }
+      }
+    },
+
+    async handleCredentialResponse(response) {
+      const data = this.parseJwt(response.credential);
+
+      try {
+        const response = await axios.post(
+          '/api/google-login',
+          {
+            FullName: data.name,
+            Email: data.email,
+            PhoneNumber: 'N/A', // Giá trị mặc định cho Google Sign-In
+            Address: 'N/A', // Giá trị mặc định cho Google Sign-In
+            AvatarUrl: data.picture,
+            Role: 'Customer', // Gán mặc định Role cho Google Sign-In
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('authToken', response.data.token);
+
+        this.router.push('/');
+        alert('Sign in successful!');
+      } catch (error) {
+        console.error('Error during the request:', error);
+      }
+    },
+    parseJwt(token) {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    },
+  },
+  // mounted() {
+  //   const script = document.createElement('script');
+  //   script.src = 'https://accounts.google.com/gsi/client';
+  //   script.async = true;
+  //   document.body.appendChild(script);
+
+  //   script.onload = () => {
+  //     google.accounts.id.initialize({
+  //       client_id: this.clientId,
+  //       callback: this.handleCredentialResponse,
+  //     });
+
+  //     google.accounts.id.renderButton(document.getElementById('buttonDiv'), {
+  //       theme: 'outline',
+  //       size: 'large',
+  //     });
+  //   };
+  // },
 };
-
-// Mounted equivalent for script setup
-onMounted(() => {});
 </script>
 
 <style scoped>
@@ -121,5 +325,39 @@ form {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.fw-bold,
+.mb-4,
+.mb-3,
+.form-label {
+  color: #000 !important; /* Màu đen cho tất cả các phần tử */
+  transition: none !important; /* Loại bỏ hiệu ứng chuyển màu */
+}
+
+.left-section {
+  background-color: #ffffff !important; /* Màu nền xanh lá nhạt */
+  color: #000 !important; /* Màu chữ đen */
+}
+
+.right-section {
+  background-color: #c7e1e4 !important; /* Màu nền xám nhạt */
+}
+.btn-primary {
+  background-color: #88c7ce !important; /* Màu nền xanh lá cây */
+  color: #fff !important; /* Màu chữ trắng */
+  border: none; /* Bỏ viền (nếu có) */
+}
+
+.btn-primary:hover {
+  background-color: #5a8b90 !important; /* Màu nền khi hover */
+  color: #fff !important; /* Màu chữ khi hover */
+}
+
+.text-center{
+  color: #000000 !important;
+}
+.left-section h1 {
+  font-size: 1.8rem; /* Tăng kích thước chữ */
+  font-weight: 700; /* Chữ đậm hơn */
 }
 </style>

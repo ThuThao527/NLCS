@@ -30,13 +30,13 @@ const fetchBlogPosts = async (page = 1, append = false) => {
   error.value = null;
   
   try {
-    const response = await axios.get(`http://localhost:3000/api/posts?page=${page}`);
+    const response = await axios.get(`/api/posts?page=${page}`);
     const data = response.data;
 
     const paginatedPosts = data.posts.map(post => ({
       id: post.BlogID,
       title: post.Title,
-      thumbnail: post.thumbnail || 'https://via.placeholder.com/400x200?text=Blog+Image',
+      thumbnail: post.Thumbnail || 'https://www.safetyandhealthmagazine.com/ext/resources/images/fsh-micro/2021/spring21/fshspring21springCleaning.jpg?t=1612280600&width=768',
       excerpt: post.Excerpt,
       rating: post.rating || 4
     }));
@@ -74,7 +74,7 @@ onMounted(() => {
 <template>
   <div class="blog-container">
     <header class="blog-header">
-      <h1>Blog Posts</h1>
+      <h1>Tin tức</h1>
       <p>Khám phá những bài viết mới nhất</p>
     </header>
 
@@ -157,9 +157,9 @@ onMounted(() => {
 
 .blog-header h1 {
   font-size: 2.5rem;
-  color: #1a1a1a;
+  color: #181818;
   margin-bottom: 10px;
-  background: linear-gradient(to right, #2563eb, #7c3aed);
+  background: linear-gradient(to right, #4d7ada, #2c5fd7);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

@@ -360,7 +360,7 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
-app.get('/api/posts', (req, res) => {
+app.get('/api/posts', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = 6;
   const offset = (page - 1) * limit;
@@ -378,6 +378,67 @@ app.get('/api/posts', (req, res) => {
     LIMIT ? OFFSET ?
   `;
 
+  // Hàm kiểm tra thumbnail
+  async function checkThumbnail(url) {
+    // Nếu không có URL hoặc không phải chuỗi, trả về lỗi ngay
+    if (!url || typeof url !== 'string') {
+      return {
+        isValid: false,
+        error: 'Thumbnail URL is missing or invalid',
+        thumbnail: null
+      };
+    }
+
+    // Kiểm tra xem URL có bắt đầu bằng http/https không
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return {
+        isValid: false,
+        error: 'Thumbnail must be a valid HTTP/HTTPS URL',
+        thumbnail: url
+      };
+    }
+
+    try {
+      const response = await axios.head(url, { timeout: 5000 }); // Timeout 5 giây
+      const contentType = response.headers['content-type'];
+
+      if (contentType && contentType.startsWith('image/')) {
+        return {
+          isValid: true,
+          error: null,
+          thumbnail: url
+        };
+      } else {
+        return {
+          isValid: false,
+          error: 'URL does not point to an image (invalid Content-Type)',
+          thumbnail: url
+        };
+      }
+    } catch (error) {
+      let errorMessage = 'Unknown error';
+      if (error.response) {
+        // Lỗi từ server (ví dụ: 404, 403)
+        errorMessage = `HTTP error ${error.response.status}: ${error.response.statusText}`;
+      } else if (error.code === 'ECONNABORTED') {
+        // Timeout
+        errorMessage = 'Request timed out';
+      } else if (error.code === 'ENOTFOUND') {
+        // Không tìm thấy domain
+        errorMessage = 'Domain not found';
+      } else {
+        // Lỗi khác
+        errorMessage = error.message;
+      }
+
+      return {
+        isValid: false,
+        error: errorMessage,
+        thumbnail: url
+      };
+    }
+  }
+
   db.query(countQuery, (err, countResults) => {
     if (err) {
       console.log('Error counting blog posts:', err);
@@ -387,21 +448,36 @@ app.get('/api/posts', (req, res) => {
     const totalPosts = countResults[0].total;
     const totalPages = Math.ceil(totalPosts / limit);
 
-    db.query(query, [limit, offset], (err, results) => {
+    db.query(query, [limit, offset], async (err, results) => {
       if (err) {
         console.log('Error retrieving blog posts:', err);
-        res.status(500).json({ message: 'Error retrieving blog posts' });
-      } else {
-        res.json({
-          posts: results,
-          pagination: {
-            currentPage: page,
-            totalPages: totalPages,
-            totalPosts: totalPosts,
-            postsPerPage: limit
-          }
-        });
+        return res.status(500).json({ message: 'Error retrieving blog posts' });
       }
+
+      // Kiểm tra thumbnail cho từng bài post
+      const postsWithThumbnailCheck = await Promise.all(
+        results.map(async (post) => {
+          const thumbnailCheck = await checkThumbnail(post.thumbnail);
+          return {
+            ...post,
+            thumbnailStatus: {
+              isValid: thumbnailCheck.isValid,
+              error: thumbnailCheck.error,
+              thumbnail: thumbnailCheck.thumbnail
+            }
+          };
+        })
+      );
+
+      res.json({
+        posts: postsWithThumbnailCheck,
+        pagination: {
+          currentPage: page,
+          totalPages: totalPages,
+          totalPosts: totalPosts,
+          postsPerPage: limit
+        }
+      });
     });
   });
 });

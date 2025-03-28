@@ -35,7 +35,7 @@
 
 <script setup>
 import { ref, shallowRef, defineAsyncComponent } from 'vue'
-import { UserIcon, CalendarIcon, PackageIcon, ShoppingCartIcon } from 'lucide-vue-next'
+import { UserIcon, CalendarIcon, PackageIcon, ShoppingCartIcon, HomeIcon } from 'lucide-vue-next'
 import apiClient from '../apiClient';
 
 // Async component imports
@@ -51,33 +51,42 @@ const ServicesComponent = defineAsyncComponent(() =>
 const BookingsComponent = defineAsyncComponent(() => 
   import('../components/BookingsComponent.vue')
 )
+const HomeComponent = defineAsyncComponent(() => 
+  import('../components/HomeComponent.vue')
+)
 
 // Navigation items
 const navItems = [
-  { 
+    { 
     id: 1, 
+    name: 'Home', 
+    component: HomeComponent, 
+    icon: HomeIcon 
+  },
+  { 
+    id: 2, 
     name: 'Profile', 
     component: ProfileComponent, 
     icon: UserIcon 
   },
   { 
-    id: 2, 
+    id: 3, 
     name: 'Schedule', 
     component: ScheduleComponent, 
     icon: CalendarIcon 
   },
   { 
-    id: 3, 
+    id: 4, 
     name: 'Services', 
     component: ServicesComponent, 
     icon: PackageIcon 
   },
   { 
-    id: 4, 
+    id: 5, 
     name: 'Bookings', 
     component: BookingsComponent, 
     icon: ShoppingCartIcon 
-  }
+  },
 ]
 
 // Active component state (using shallowRef for performance with components)

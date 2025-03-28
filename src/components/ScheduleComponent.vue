@@ -220,7 +220,7 @@
                 <div class="saved-date">{{ formatDateShort(new Date(dateString)) }}</div>
                 <div class="saved-shift-tags">
                   <span 
-                    v-if="shifts.includes('full')"
+                    v-if="shifts.includes('fullday')"
                   >
                     Full Day
                   </span>
@@ -256,8 +256,17 @@
 // Giữ nguyên phần script của bạn
 import { ref, computed } from 'vue';
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
+import { useRoute } from 'vue-router';
+import axios from 'axios';
 
-// State
+
+const apiBaseUrl = 'http://localhost:3000';
+const route = useRoute();
+const helperId = computed(() => {
+  const id = route.params.id;
+  return id ? parseInt(id, 10) : 1;
+});
+
 const today = new Date();
 const currentMonth = ref(today.getMonth());
 const currentYear = ref(today.getFullYear());
@@ -322,6 +331,22 @@ const calendarDays = computed(() => {
 const sortedSelectedDates = computed(() => {
   return [...selectedDates.value].sort((a, b) => a - b);
 });
+
+
+async function fetchAvailability() {
+  console.log('HelperID before fetch:', helperId.value);
+  try {
+    const response = await axios.get(`${apiBaseUrl}/availability`, {
+      params: { helperId: helperId.value }
+    });
+    dateShifts.value = response.data;
+    console.log('Fetched availability:', dateShifts.value);
+  } catch (error) {
+    console.error('Error fetching availability:', error);
+  }
+}
+
+fetchAvailability();
 
 // Methods
 function previousMonth() {
@@ -428,20 +453,31 @@ function handleFullDaySelection() {
   }
 }
 
-function applyShiftsToSelectedDates() {
+async function applyShiftsToSelectedDates() {
   if (selectedDates.value.length === 0) return;
   if (!isFullDaySelected.value && selectedShifts.value.length === 0) return;
-  selectedDates.value.forEach(date => {
-    const dateString = date.toISOString().split('T')[0];
-    if (isFullDaySelected.value) {
-      dateShifts.value[dateString] = ['full'];
-    } else {
-      dateShifts.value[dateString] = [...selectedShifts.value];
-    }
-  });
-  selectedDates.value = [];
-  selectedShifts.value = [];
-  isFullDaySelected.value = false;
+
+  const dates = selectedDates.value.map(date => date.toISOString().split('T')[0]);
+  const shifts = isFullDaySelected.value ? ['fullday'] : [...selectedShifts.value];
+
+  try {
+    const response = await axios.post(`${apiBaseUrl}/availabilityUpdate`, {
+      helperId: helperId.value,
+      dates,
+      shifts
+    });
+    console.log('Saved shifts successfully:', response.data);
+
+    // Cập nhật dateShifts sau khi lưu thành công
+    dates.forEach(date => {
+      dateShifts.value[date] = shifts;
+    });
+    selectedDates.value = [];
+    selectedShifts.value = [];
+    isFullDaySelected.value = false;
+  } catch (error) {
+    console.error('Error saving shifts:', error);
+  }
 }
 
 function getShiftsForDate(date) {
@@ -451,13 +487,23 @@ function getShiftsForDate(date) {
 
 function isFullDayShift(date) {
   const shifts = getShiftsForDate(date);
-  return shifts.includes('full');
+  return shifts.includes('fullday');
 }
 
-function removeDateShift(dateString) {
-  const newDateShifts = { ...dateShifts.value };
-  delete newDateShifts[dateString];
-  dateShifts.value = newDateShifts;
+async function removeDateShift(dateString) {
+  try {
+    const response = await axios.delete(`${apiBaseUrl}/availability/${dateString}`, {
+      params: { helperId }
+    });
+    console.log('Deleted shift successfully:', response.data);
+
+    // Cập nhật dateShifts sau khi xóa
+    const newDateShifts = { ...dateShifts.value };
+    delete newDateShifts[dateString];
+    dateShifts.value = newDateShifts;
+  } catch (error) {
+    console.error('Error deleting shift:', error);
+  }
 }
 
 function isSameDay(date1, date2) {

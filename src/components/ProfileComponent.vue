@@ -1,6 +1,6 @@
 <template>
   <div class="profile-container">
-    <h1>Thông tin các nhân</h1>
+    <h1>Thông tin cá nhân</h1>
     
     <div class="profile-grid">
       <!-- Profile Picture Section -->
@@ -73,6 +73,9 @@
                     type="text" 
                     placeholder="Nhập họ và tên"
                   />
+                  <div v-if="validationErrors.fullName" class="error-message">
+                    {{ validationErrors.fullName }}
+                  </div>
                 </template>
               </div>
             </div>
@@ -110,6 +113,9 @@
                     type="tel" 
                     placeholder="Nhập số điện thoại"
                   />
+                  <div v-if="validationErrors.phoneNumber" class="error-message">
+                    {{ validationErrors.phoneNumber }}
+                  </div>
                 </template>
               </div>
             </div>
@@ -135,125 +141,216 @@
         
         <!-- Additional Information Section -->
         <div class="info-card">
-            <h3>Đánh gia công việc</h3>
+          <h3>Đánh giá công việc</h3>
+          
+          <div class="info-list">
+            <!-- Average Rating -->
+            <div class="info-item">
+              <div class="info-label">Sao trung bình</div>
+              <div class="info-content">
+                <div class="rating-wrapper">
+                  <span v-for="n in 5" :key="n" class="star">
+                    <Star :class="{ 'filled': n <= Math.round(profileData.averageRating) }" />
+                  </span>
+                  <span class="rating-text">{{ (profileData.averageRating || 0).toFixed(1) }} / 5</span>
+                  </div>
+              </div>
+            </div>
             
-            <div class="info-list">
-                <!-- Average Rating -->
-                <div class="info-item">
-                <div class="info-label">Sao trung bình</div>
-                <div class="info-content">
-                    <div class="rating-wrapper">
-                    <span v-for="n in 5" :key="n" class="star">
-                        <Star :class="{ 'filled': n <= Math.round(profileData.averageRating) }" />
-                    </span>
-                    <span class="rating-text">{{ profileData.averageRating.toFixed(1) }} / 5</span>
-                    </div>
-                </div>
-                </div>
-                
-                <!-- Average Working Hours -->
-                <div class="info-item">
-                <div class="info-label">Số giờ làm trung bình</div>
-                <div class="info-content">
-                    <div>{{ profileData.averageWorkingHours.toFixed(1) }} hours/week</div>
-                </div>
-                </div>
+            <!-- Total Working Hours -->
+            <div class="info-item">
+              <div class="info-label">Tổng số giờ làm</div>
+              <div class="info-content">
+                <div>{{ profileData.totalWorkingHours.toFixed(1) }} giờ</div>
+              </div>
             </div>
-            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, onMounted , watch} from 'vue';
+import axios from 'axios';
 import { User, Edit, Save, Camera, Star } from 'lucide-vue-next';
-
-// Mock data - in a real app, this would come from an API
-const defaultProfile = {
-  fullName: 'Alex Johnson',
-  email: 'alex.johnson@example.com',
-  phoneNumber: '(555) 123-4567',
-  address: '123 Main Street\nApt 4B\nNew York, NY 10001',
-  profilePicture: null,
-  memberSince: new Date('2022-03-15'),
-  lastUpdated: new Date('2023-11-20'),
-  averageRating: 4.5, // Thêm số sao trung bình (từ 0 đến 5)
-  averageWorkingHours: 35.5
-};
+import { useRoute } from 'vue-router'; // Để lấy helperId từ route
 
 // State
-const profileData = ref({...defaultProfile});
+const profileData = ref({
+  fullName: '',
+  email: '',
+  phoneNumber: '',
+  address: '',
+  profilePicture: null,
+  averageRating: 0,
+  totalWorkingHours: 0, // Đổi từ averageWorkingHours thành totalWorkingHours để khớp với API
+});
+
+watch(() => profileData.value.averageRating, (newValue, oldValue) => {
+  console.log(`averageRating changed from ${oldValue} to ${newValue}`);
+});
+
 const isEditing = ref(false);
 const editedProfile = ref({});
 const validationErrors = ref({});
 
-// Start editing mode
+// API base URL
+const API_BASE_URL = 'http://localhost:3000/api';
+
+// Lấy helperId từ route (hoặc từ props, tùy vào cách bạn truyền)
+const route = useRoute();
+const helperId = route.params.id || 1; // Lấy từ route hoặc mặc định là 1
+
+// Hàm lấy dữ liệu Helper từ API
+async function fetchHelperData() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    // Lấy thông tin Helper
+    const response = await axios.get(`${API_BASE_URL}/helpers/${helperId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    profileData.value = {
+      fullName: response.data.helper.HelperName || '',
+      email: response.data.helper.Email || '',
+      phoneNumber: response.data.helper.Phone || '',
+      address: response.data.helper.Address || 'Not provided',
+      profilePicture: response.data.helper.IMG_Helper ? `${response.data.helper.IMG_Helper}` : null,
+      averageRating: 0, // Sẽ cập nhật sau khi gọi API rating
+      totalWorkingHours: 0, // Sẽ cập nhật sau khi gọi API total-hours
+    };
+
+    // Lấy tổng giờ làm
+    const totalHoursResponse = await axios.get(`${API_BASE_URL}/helpers/${helperId}/total-hours`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    profileData.value.totalWorkingHours = totalHoursResponse.data.totalHours || 0;
+
+
+    console.log('Calling /api/helpers/:helperId/rating-stats');
+    const ratingResponse = await axios.get(`${API_BASE_URL}/helpers/${helperId}/rating-stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log('Rating response:', ratingResponse.data);
+    profileData.value.averageRating = Number(ratingResponse.data.averageRating) || 0;
+    console.log('Updated averageRating:', profileData.value.averageRating); // Thêm log để kiểm tra
+  } catch (error) {
+    console.error('Error fetching helper data:', error);
+    alert('Không thể tải dữ liệu hồ sơ: ' + (error.response?.data?.message || error.message));
+  }
+}
+
+// Bắt đầu chỉnh sửa
 function startEditing() {
-  editedProfile.value = {...profileData.value};
+  editedProfile.value = { ...profileData.value };
   isEditing.value = true;
   validationErrors.value = {};
 }
 
-// Cancel editing and revert changes
+// Hủy chỉnh sửa
 function cancelEditing() {
   isEditing.value = false;
   validationErrors.value = {};
+  editedProfile.value = {};
 }
 
-// Validate the form
+// Validate form trước khi lưu
 function validateForm() {
   const errors = {};
-  
-  // Email validation
-  if (editedProfile.value.email) {
+
+  // Validate Full Name
+  if (!editedProfile.value.fullName || editedProfile.value.fullName.trim() === '') {
+    errors.fullName = 'Họ tên không được để trống';
+  }
+
+  // Validate Email
+  if (!editedProfile.value.email) {
+    errors.email = 'Email không được để trống';
+  } else {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(editedProfile.value.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = 'Vui lòng nhập địa chỉ email hợp lệ';
     }
   }
-  
+
+  // Validate Phone Number
+  if (!editedProfile.value.phoneNumber) {
+    errors.phoneNumber = 'Số điện thoại không được để trống';
+  } else {
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(editedProfile.value.phoneNumber)) {
+      errors.phoneNumber = 'Số điện thoại không hợp lệ (VD: +84888211527)';
+    }
+  }
+
   validationErrors.value = errors;
   return Object.keys(errors).length === 0;
 }
 
-// Save profile changes
-function saveProfile() {
-  if (!validateForm()) {
-    return;
+// Lưu thay đổi hồ sơ
+async function saveProfile() {
+  if (!validateForm()) return;
+
+  const formData = new FormData();
+  formData.append('HelperName', editedProfile.value.fullName);
+  formData.append('Email', editedProfile.value.email);
+  formData.append('Phone', editedProfile.value.phoneNumber);
+  formData.append('Address', editedProfile.value.address || ''); // Đảm bảo gửi Address
+
+  // Xử lý upload ảnh nếu có
+  if (editedProfile.value.profilePicture && editedProfile.value.profilePicture.startsWith('data:')) {
+    const blob = await (await fetch(editedProfile.value.profilePicture)).blob();
+    formData.append('avatar', blob, 'avatar.jpg');
   }
-  
-  profileData.value = {
-    ...editedProfile.value,
-    lastUpdated: new Date()
-  };
-  
-  isEditing.value = false;
-  
-  // In a real app, you would send the updated profile to your API here
-  console.log('Profile saved:', profileData.value);
-  
-  // Show success message (in a real app)
-  alert('Profile updated successfully!');
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.put(`${API_BASE_URL}/helpersUpdate/${helperId}`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    // Cập nhật lại profileData với dữ liệu mới
+    profileData.value = {
+      ...profileData.value,
+      fullName: editedProfile.value.fullName,
+      email: editedProfile.value.email,
+      phoneNumber: editedProfile.value.phoneNumber,
+      address: editedProfile.value.address,
+      profilePicture: response.data.avatarUrl || profileData.value.profilePicture,
+    };
+
+    isEditing.value = false;
+    alert('Cập nhật thông tin thành công!');
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    alert('Cập nhật thông tin thất bại: ' + (error.response?.data?.message || error.message));
+  }
 }
 
-// Handle profile picture upload
+// Xử lý upload ảnh
 function handleImageUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
-  
-  // Check file type
+
   if (!file.type.match('image.*')) {
-    alert('Please select an image file');
+    alert('Vui lòng chọn một tệp ảnh');
     return;
   }
-  
-  // Check file size (max 5MB)
+
   if (file.size > 5 * 1024 * 1024) {
-    alert('Image size should not exceed 5MB');
+    alert('Kích thước ảnh không được vượt quá 5MB');
     return;
   }
-  
+
   const reader = new FileReader();
   reader.onload = (e) => {
     editedProfile.value.profilePicture = e.target.result;
@@ -261,31 +358,14 @@ function handleImageUpload(event) {
   reader.readAsDataURL(file);
 }
 
-// Format date for display
-function formatDate(date) {
-  if (!date) return 'N/A';
-  
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-}
-
-// Load profile data
+// Load dữ liệu khi component được mount
 onMounted(() => {
-  // In a real app, you would fetch the profile data from your API here
-  // For this example, we're using the mock data
-  
-  // Simulate API delay
-  setTimeout(() => {
-    profileData.value = {...defaultProfile};
-  }, 300);
+  fetchHelperData();
 });
 </script>
 
 <style scoped>
-/* Container chính */
+/* Giữ nguyên toàn bộ CSS của bạn */
 .profile-container {
   padding: 2rem;
   max-width: 64rem;
@@ -296,7 +376,6 @@ onMounted(() => {
   border: 1px solid #e5e7eb;
 }
 
-/* Tiêu đề */
 .profile-container h1 {
   font-size: 2rem;
   font-weight: 700;
@@ -307,7 +386,6 @@ onMounted(() => {
   letter-spacing: 0.05em;
 }
 
-/* Grid chính */
 .profile-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -320,7 +398,6 @@ onMounted(() => {
   }
 }
 
-/* Phần ảnh đại diện (bên trái) */
 .profile-picture-section {
   display: flex;
   flex-direction: column;
@@ -414,7 +491,6 @@ onMounted(() => {
   color: #6b7280;
 }
 
-/* Nút hành động */
 .action-buttons {
   margin-top: 2rem;
   width: 100%;
@@ -470,7 +546,6 @@ onMounted(() => {
   height: 1rem;
 }
 
-/* Phần thông tin (bên phải) */
 .info-section {
   display: flex;
   flex-direction: column;
@@ -552,6 +627,7 @@ onMounted(() => {
   color: #ef4444;
   margin-top: 0.25rem;
 }
+
 .rating-wrapper {
   display: flex;
   align-items: center;
@@ -565,12 +641,12 @@ onMounted(() => {
 .star svg {
   width: 1.25rem;
   height: 1.25rem;
-  color: #d1d5db; /* Màu sao trống */
+  color: #d1d5db;
   transition: color 0.3s ease;
 }
 
 .star .filled {
-  color: #f59e0b; /* Màu sao đầy */
+  color: #f59e0b;
 }
 
 .rating-text {
@@ -578,5 +654,4 @@ onMounted(() => {
   color: #111827;
   font-weight: 500;
 }
-
 </style>

@@ -1,24 +1,31 @@
 import jwt from 'jsonwebtoken';
 
-// Middleware để xác thực token
+
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Lấy token từ "Bearer <token>"
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    console.log('No token provided');
     return res.status(401).json({ message: 'Access token is required' });
   }
 
   const jwtSecret = process.env.JWT_SECRET;
+  console.log('JWT_SECRET:', jwtSecret); // Log secret key
+  console.log('Token received:', token); // Log token
+
   jwt.verify(token, jwtSecret, (err, user) => {
     if (err) {
+      console.log('Token verification error:', err.message); // Log lỗi cụ thể
       if (err.name === 'TokenExpiredError') {
         return res.status(403).json({ message: 'Token has expired' });
       }
-      return res.status(403).json({ message: 'Invalid token' });
+      return res.status(403).json({ message: `Invalid token - ${err.message}` });
     }
-
-    req.user = user; // Lưu thông tin người dùng từ token vào req.user
+    console.log('Valid token!');
+    console.log('Decoded user from token:', user);
+    req.user = user;
     next();
   });
 };

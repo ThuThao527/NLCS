@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import mysql from 'mysql2';
+import mysql from 'mysql2/promise';
 import axios from 'axios';
 import util from 'util';
 import { constrainedMemory } from 'process';
@@ -12,7 +12,9 @@ import dotenv from 'dotenv';
 import authenticateToken from './middleware/auth.js';
 import { fileURLToPath } from 'url';
 
+
 dotenv.config();
+console.log('JWT_SECRET right after dotenv:', process.env.JWT_SECRET);
 const app = express();
 const port = 3000;
 
@@ -22,9 +24,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use(
   cors({
-    origin: 'http://localhost:5173', // Cho phép yêu cầu từ front-end trên cổng 5173
+    origin: 'http://localhost:5175', // Cho phép yêu cầu từ front-end trên cổng 5173
     methods: ['GET', 'POST', 'PUT', 'DELETE'], // Cho phép các phương thức HTTP này
-    allowedHeaders: ['Content-Type'], // Các headers được phép
+    allowedHeaders: ['Content-Type', 'Authorization'], // Các headers được phép
   })
 );
 
@@ -62,39 +64,56 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // Giới hạn kích thước file: 5MB
 });
 
-app.use(function (req, res, next) {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  res.header('Cross-Origin-Embedder-Policy', 'require-corp');
-  res.header('Cross-Origin-Opener-Policy', 'same-origin');
-  next();
-});
-
 
 // Kết nối MySQL
-const db = mysql.createConnection({
+// const db = await mysql.createConnection({
+//   host: 'localhost',
+//   user: 'root',
+//   password: process.env.PASSWORD_MYSQL,
+//   database: 'TourManagement',
+//   connectTimeout: 10000,
+// });
+
+// try {
+//   await db.connect();
+//   console.log('Connected to MySQL');
+// } catch (err) {
+//   console.error('Error connecting to MySQL:', err);
+//   process.exit(1);
+// }
+
+const pool = mysql.createPool({
   host: 'localhost',
   user: 'root',
-  password: process.env.PASSWORD_MYSQL, // Thay bằng mật khẩu của bạn
-  database: 'TourManagement', // Tên database
+  password: process.env.PASSWORD_MYSQL,
+  database: 'TourManagement',
   connectTimeout: 10000,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
-db.connect((err) => {
-  if (err) {
+// Kiểm tra kết nối
+(async () => {
+  try {
+    const connection = await pool.getConnection();
+    console.log('Connected to MySQL');
+    connection.release();
+  } catch (err) {
     console.error('Error connecting to MySQL:', err);
     process.exit(1);
-  } else {
-    console.log('Connected to MySQL');
   }
+})();
+
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
 });
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 
 // 2. API Cập nhật Helper (Update)
-app.put('/api/helpers/:id', authenticateToken, upload.single('avatar'), async (req, res) => {
+app.put('/api/helpersUpdate/:id', authenticateToken, upload.single('avatar'), async (req, res) => {
   const { id } = req.params;
   const { HelperName, Email, Phone } = req.body;
 
@@ -149,43 +168,72 @@ app.put('/api/helpers/:id', authenticateToken, upload.single('avatar'), async (r
   }
 });
 // 3. API Xóa Helper (Delete)
-app.delete('/api/helpers/:id', authenticateToken, async (req, res) => {
+app.put('/api/helpersUpdate/:id', authenticateToken, upload.single('avatar'), async (req, res) => {
   const { id } = req.params;
+  const { HelperName, Email, Phone } = req.body;
+
+  if (req.user.role !== 'Admin' && req.user.userId !== parseInt(id)) {
+    console.log('Authorization failed:', {
+      userId: req.user.userId,
+      role: req.user.role,
+      requestedId: id,
+    });
+    return res.status(403).json({ message: 'You are not authorized to update this helper' });
+  }
+
+  if (!HelperName || !Email || !Phone) {
+    console.log('Validation failed: Missing required fields', { HelperName, Email, Phone });
+    return res.status(400).json({ message: 'HelperName, Email, and Phone are required' });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(Email)) {
+    console.log('Validation failed: Invalid email format', { Email });
+    return res.status(400).json({ message: 'Invalid email format' });
+  }
 
   try {
-    // Kiểm tra xem Helper có tồn tại không
-    const [existingHelper] = await db.query(
-      `SELECT * FROM Helper WHERE HelperID = ?`,
-      [id]
-    );
-    if (existingHelper.length === 0) {
+    let avatarUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
+    console.log('Avatar upload result:', { avatarUrl });
+
+    const updateFields = [HelperName, Email, Phone];
+    let query = `UPDATE Helper SET HelperName = ?, Email = ?, Phone = ?`;
+    if (avatarUrl) {
+      query += `, IMG_Helper = ?`;
+      updateFields.push(avatarUrl);
+    }
+    updateFields.push(id);
+    query += ` WHERE HelperID = ?`;
+
+    const [result] = await db.query(query, updateFields);
+
+    if (result.affectedRows === 0) {
+      console.log('Update failed: Helper not found', { id });
       return res.status(404).json({ message: 'Helper not found' });
     }
 
-    // Xóa Helper (các bảng liên quan như HelperRate, Availability, Booking sẽ tự động xóa nhờ ON DELETE CASCADE)
-    await db.query(
-      `DELETE FROM Helper WHERE HelperID = ?`,
-      [id]
-    );
-
-    res.status(200).json({ message: 'Helper deleted successfully' });
+    console.log('Helper updated successfully:', { id, HelperName, Email, Phone, avatarUrl });
+    res.status(200).json({ message: 'Helper updated successfully', avatarUrl });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to delete helper', error: error.message });
+    console.error('Error updating helper:', {
+      message: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({ message: 'Failed to update helper', error: error.message });
   }
 });
+
 
 // 4. API Lấy thông tin một Helper theo ID (Read)
 app.get('/api/helpers/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
 
-  // Kiểm tra quyền (nếu cần)
-  // Ví dụ: Chỉ cho phép Admin hoặc chính helper đó truy cập
   if (req.user.role !== 'Helper' && req.user.userId !== parseInt(id)) {
     return res.status(403).json({ message: 'You are not authorized to access this helper' });
   }
 
   try {
-    const [helper] = await db.query(
+    const [helper] = await pool.query(
       `SELECT * FROM Helper WHERE HelperID = ?`,
       [id]
     );
@@ -469,335 +517,6 @@ app.get('/api/helper-rates', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Failed to retrieve helper rates', error: error.message });
   }
 });
-
-
-// 1. API Tạo Availability (Create)
-app.post('/api/availabilities', authenticateToken, async (req, res) => {
-  const { HelperID, Date, StartTime, EndTime, Status } = req.body;
-
-  try {
-    // Kiểm tra dữ liệu đầu vào
-    if (!HelperID || !Date || !StartTime || !EndTime) {
-      return res.status(400).json({ message: 'HelperID, Date, StartTime, and EndTime are required' });
-    }
-
-    // Kiểm tra xem HelperID có tồn tại không
-    const [existingHelper] = await db.query(
-      `SELECT * FROM Helper WHERE HelperID = ?`,
-      [HelperID]
-    );
-    if (existingHelper.length === 0) {
-      return res.status(400).json({ message: 'Helper not found' });
-    }
-
-    // Kiểm tra StartTime < EndTime
-    if (StartTime >= EndTime) {
-      return res.status(400).json({ message: 'StartTime must be less than EndTime' });
-    }
-
-    // Kiểm tra xem khung giờ có bị trùng không
-    const [overlappingAvailability] = await db.query(
-      `
-      SELECT * FROM Availability
-      WHERE HelperID = ? AND Date = ?
-        AND (
-          (StartTime <= ? AND EndTime > ?) OR
-          (StartTime < ? AND EndTime >= ?) OR
-          (StartTime >= ? AND EndTime <= ?)
-        )
-      `,
-      [HelperID, Date, StartTime, StartTime, EndTime, EndTime, StartTime, EndTime]
-    );
-    if (overlappingAvailability.length > 0) {
-      return res.status(400).json({ message: 'The time slot overlaps with an existing availability' });
-    }
-
-    // Tạo Availability mới
-    const [result] = await db.query(
-      `
-      INSERT INTO Availability (HelperID, Date, StartTime, EndTime, Status)
-      VALUES (?, ?, ?, ?, ?)
-      `,
-      [HelperID, Date, StartTime, EndTime, Status || 'Available']
-    );
-
-    // Lấy thông tin Availability vừa tạo
-    const [newAvailability] = await db.query(
-      `SELECT * FROM Availability WHERE AvailabilityID = ?`,
-      [result.insertId]
-    );
-
-    res.status(201).json({
-      message: 'Availability created successfully',
-      availability: newAvailability[0],
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to create availability', error: error.message });
-  }
-});
-
-// 2. API Cập nhật Availability (Update)
-app.put('/api/availabilities/:id', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const { HelperID, Date, StartTime, EndTime, Status } = req.body;
-
-  try {
-    // Kiểm tra xem Availability có tồn tại không
-    const [existingAvailability] = await db.query(
-      `SELECT * FROM Availability WHERE AvailabilityID = ?`,
-      [id]
-    );
-    if (existingAvailability.length === 0) {
-      return res.status(404).json({ message: 'Availability not found' });
-    }
-
-    // Kiểm tra HelperID nếu có thay đổi
-    if (HelperID && HelperID !== existingAvailability[0].HelperID) {
-      const [existingHelper] = await db.query(
-        `SELECT * FROM Helper WHERE HelperID = ?`,
-        [HelperID]
-      );
-      if (existingHelper.length === 0) {
-        return res.status(400).json({ message: 'Helper not found' });
-      }
-    }
-
-    // Kiểm tra StartTime < EndTime nếu có thay đổi
-    const newStartTime = StartTime || existingAvailability[0].StartTime;
-    const newEndTime = EndTime || existingAvailability[0].EndTime;
-    if (newStartTime >= newEndTime) {
-      return res.status(400).json({ message: 'StartTime must be less than EndTime' });
-    }
-
-    // Kiểm tra khung giờ trùng nếu có thay đổi thời gian
-    const newDate = Date || existingAvailability[0].Date;
-    const newHelperID = HelperID || existingAvailability[0].HelperID;
-    if (StartTime || EndTime || Date || HelperID) {
-      const [overlappingAvailability] = await db.query(
-        `
-        SELECT * FROM Availability
-        WHERE HelperID = ? AND Date = ?
-          AND (
-            (StartTime <= ? AND EndTime > ?) OR
-            (StartTime < ? AND EndTime >= ?) OR
-            (StartTime >= ? AND EndTime <= ?)
-          )
-          AND AvailabilityID != ?
-        `,
-        [newHelperID, newDate, newStartTime, newStartTime, newEndTime, newEndTime, newStartTime, newEndTime, id]
-      );
-      if (overlappingAvailability.length > 0) {
-        return res.status(400).json({ message: 'The time slot overlaps with an existing availability' });
-      }
-    }
-
-    // Cập nhật Availability
-    await db.query(
-      `
-      UPDATE Availability
-      SET HelperID = ?, Date = ?, StartTime = ?, EndTime = ?, Status = ?
-      WHERE AvailabilityID = ?
-      `,
-      [
-        newHelperID,
-        newDate,
-        newStartTime,
-        newEndTime,
-        Status || existingAvailability[0].Status,
-        id,
-      ]
-    );
-
-    // Lấy thông tin Availability sau khi cập nhật
-    const [updatedAvailability] = await db.query(
-      `SELECT * FROM Availability WHERE AvailabilityID = ?`,
-      [id]
-    );
-
-    res.status(200).json({
-      message: 'Availability updated successfully',
-      availability: updatedAvailability[0],
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to update availability', error: error.message });
-  }
-});
-
-// 3. API Xóa Availability (Delete)
-app.delete('/api/availabilities/:id', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    // Kiểm tra xem Availability có tồn tại không
-    const [existingAvailability] = await db.query(
-      `SELECT * FROM Availability WHERE AvailabilityID = ?`,
-      [id]
-    );
-    if (existingAvailability.length === 0) {
-      return res.status(404).json({ message: 'Availability not found' });
-    }
-
-    // Xóa Availability
-    await db.query(
-      `DELETE FROM Availability WHERE AvailabilityID = ?`,
-      [id]
-    );
-
-    res.status(200).json({ message: 'Availability deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to delete availability', error: error.message });
-  }
-});
-
-// 4. API Lấy thông tin một Availability theo ID (Read)
-app.get('/api/availabilities/:id', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const [availability] = await db.query(
-      `SELECT * FROM Availability WHERE AvailabilityID = ?`,
-      [id]
-    );
-
-    if (availability.length === 0) {
-      return res.status(404).json({ message: 'Availability not found' });
-    }
-
-    res.status(200).json({
-      message: 'Availability retrieved successfully',
-      availability: availability[0],
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to retrieve availability', error: error.message });
-  }
-});
-
-// 5. API Lấy danh sách Availability (Read, với lọc theo Status, giá, ngày, ngày giờ, HelperID)
-app.get('/api/availabilities', authenticateToken, async (req, res) => {
-  const { minPrice, maxPrice, date, helperId, session, page = 1, limit = 10 } = req.query;
-  const offset = (page - 1) * limit;
-
-  try {
-    let query = `
-      SELECT a.*, h.FullName AS HelperName
-      FROM Availability a
-      JOIN Helper h ON a.HelperID = h.HelperID
-      WHERE a.Status = 'Available'
-    `;
-    let countQuery = `
-      SELECT COUNT(*) as total
-      FROM Availability a
-      JOIN Helper h ON a.HelperID = h.HelperID
-      WHERE a.Status = 'Available'
-    `;
-    const params = [];
-
-    const conditions = [];
-    if (date) {
-      conditions.push(`a.Date = ?`);
-      params.push(date);
-    }
-    if (helperId) {
-      conditions.push(`a.HelperID = ?`);
-      params.push(helperId);
-    }
-    if (session) {
-      if (session === 'session1') {
-        conditions.push(`a.StartTime = '07:00:00' AND a.EndTime = '12:00:00'`);
-      } else if (session === 'session2') {
-        conditions.push(`a.StartTime = '13:00:00' AND a.EndTime = '17:00:00'`);
-      } else if (session === 'fullDay') {
-        conditions.push(`a.StartTime = '07:00:00' AND a.EndTime = '17:00:00'`);
-      }
-    }
-
-    if (conditions.length > 0) {
-      const whereClause = ` AND ${conditions.join(' AND ')}`;
-      query += whereClause;
-      countQuery += whereClause;
-    }
-
-    const [availabilities] = await db.query(query, params);
-
-    const availabilitiesWithPrice = await Promise.all(
-      availabilities.map(async (availability) => {
-        const price = await calculateTotalCost(
-          availability.HelperID,
-          `${availability.Date} ${availability.StartTime}`,
-          `${availability.Date} ${availability.EndTime}`
-        );
-        return { ...availability, Price: price };
-      })
-    );
-
-    let filteredAvailabilities = availabilitiesWithPrice;
-    if (minPrice || maxPrice) {
-      filteredAvailabilities = availabilitiesWithPrice.filter((availability) => {
-        const price = availability.Price;
-        const min = minPrice ? parseFloat(minPrice) : -Infinity;
-        const max = maxPrice ? parseFloat(maxPrice) : Infinity;
-        return price >= min && price <= max;
-      });
-    }
-
-    const paginatedAvailabilities = filteredAvailabilities.slice(offset, offset + parseInt(limit));
-    const total = filteredAvailabilities.length;
-
-    res.status(200).json({
-      message: 'Availabilities retrieved successfully',
-      availabilities: paginatedAvailabilities,
-      total: total,
-      page: parseInt(page),
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to retrieve availabilities', error: error.message });
-  }
-});
-
-app.get('/api/helpers/search',authenticateToken, async (req, res) => {
-  const { name, page = 1, limit = 10 } = req.query;
-  const offset = (page - 1) * limit;
-
-  try {
-    let query = `
-      SELECT h.*, 
-             COALESCE(AVG(r.Rating), 0) AS AverageRating
-      FROM Helper h
-      LEFT JOIN Review r ON h.HelperID = r.HelperID
-    `;
-    let countQuery = `
-      SELECT COUNT(*) as total
-      FROM Helper h
-    `;
-    const params = [];
-
-    if (name) {
-      query += ` WHERE h.FullName LIKE ?`;
-      countQuery += ` WHERE h.FullName LIKE ?`;
-      params.push(`%${name}%`);
-    }
-
-    query += ` GROUP BY h.HelperID LIMIT ? OFFSET ?`;
-    params.push(parseInt(limit), parseInt(offset));
-
-    const [helpers] = await db.query(query, params);
-    const [countResult] = await db.query(countQuery, params.slice(0, params.length - 2));
-    const total = countResult[0].total;
-
-    res.status(200).json({
-      message: 'Helpers retrieved successfully',
-      helpers: helpers,
-      total: total,
-      page: parseInt(page),
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to retrieve helpers', error: error.message });
-  }
-});
-
-
 
 // Hàm tính TotalCost (tái sử dụng từ API trước đó)
 async function calculateTotalCost(helperId, startTime, endTime) {
@@ -1454,40 +1173,66 @@ app.get('/api/reviews', authenticateToken, async (req, res) => {
 
 
 // Hàm tính Total_Hours từ Booking
-async function calculateTotalHours(bookingId) {
+async function getTotalHoursByHelper(helperId) {
   try {
-    const [booking] = await db.query(
-      `SELECT StartTime, EndTime FROM Booking WHERE BookingID = ?`,
-      [bookingId]
+    const [bookings] = await pool.query(
+      `SELECT TIMESTAMPDIFF(SECOND, StartTime, EndTime) as seconds 
+       FROM booking 
+       WHERE HelperID = ? AND status = 'completed'`,
+      [helperId]
     );
-    if (booking.length === 0) {
-      throw new Error('Booking not found');
-    }
 
-    const start = new Date(booking[0].StartTime);
-    const end = new Date(booking[0].EndTime);
-    const hours = (end - start) / (1000 * 60 * 60); // Chuyển thành giờ
-    return parseFloat(hours.toFixed(2));
+    const totalSeconds = bookings.reduce((sum, booking) => sum + booking.seconds, 0);
+    const totalHours = totalSeconds / 3600;
+    return parseFloat(totalHours.toFixed(2));
   } catch (error) {
     throw new Error(`Error calculating total hours: ${error.message}`);
   }
 }
-
 // Hàm tính Average_star từ Review
-async function calculateAverageStar(bookingId) {
+async function getAverageRatingByHelper(helperId) {
   try {
-    const [review] = await db.query(
-      `SELECT Rating FROM Review WHERE BookingID = ?`,
-      [bookingId]
+    // Làm tròn 1 số thập phân
+    const [result] = await pool.query(
+      `SELECT 
+        ROUND(AVG(r.Rating), 1) as avgRating,
+        COUNT(r.ReviewID) as reviewCount
+      FROM Booking b
+      JOIN Review r ON b.BookingID = r.BookingID
+      WHERE b.HelperID = ? 
+        AND b.status = 'completed'
+        AND r.Rating BETWEEN 1 AND 5`,
+      [helperId]
     );
-    if (review.length === 0) {
-      return null; // Nếu không có Review, trả về null
-    }
-    return parseFloat(review[0].Rating.toFixed(1));
+
+    return {
+      averageRating: result[0].avgRating || 0,
+      totalReviews: result[0].reviewCount
+    };
   } catch (error) {
-    throw new Error(`Error calculating average star: ${error.message}`);
+    throw new Error(`Error calculating average rating: ${error.message}`);
   }
 }
+
+// API lấy tổng giờ làm
+app.get('/api/helpers/:helperId/total-hours', async (req, res) => {
+  try {
+    const totalHours = await getTotalHoursByHelper(req.params.helperId);
+    res.json({ totalHours });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API lấy điểm trung bình
+app.get('/api/helpers/:helperId/rating-stats', async (req, res) => {
+  try {
+    const ratingStats = await getAverageRatingByHelper(req.params.helperId);
+    res.json(ratingStats);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // 1. API Tạo WorkHistory (Create)
 app.post('/api/work-histories', authenticateToken, async (req, res) => {
@@ -1735,7 +1480,68 @@ app.get('/api/work-histories', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/posts', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 6;
+  const offset = (page - 1) * limit;
 
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM blog
+    INNER JOIN categories ON blog.CategoryID = categories.CategoryID
+  `;
+
+  const query = `
+    SELECT blog.*, categories.Name
+    FROM blog
+    INNER JOIN categories ON blog.CategoryID = categories.CategoryID
+    LIMIT ? OFFSET ?
+  `;
+
+  try {
+    const [countResults] = await db.query(countQuery);
+    const totalPosts = countResults[0].total;
+    const totalPages = Math.ceil(totalPosts / limit);
+
+    const [results] = await db.query(query, [limit, offset]);
+
+    res.json({
+      posts: results,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalPosts: totalPosts,
+        postsPerPage: limit
+      }
+    });
+  } catch (error) {
+    console.log('Error retrieving blog posts:', error);
+    res.status(500).json({ message: 'Error retrieving blog posts', error: error.message });
+  }
+});
+
+// API lấy chi tiết một blog theo ID
+app.get('/api/posts/:id', async (req, res) => {
+  const blogId = req.params.id;
+  const query = `
+    SELECT blog.*, categories.Name
+    FROM blog
+    INNER JOIN categories ON blog.CategoryID = categories.CategoryID
+    WHERE blog.BlogID = ?
+  `;
+
+  try {
+    const [results] = await db.query(query, [blogId]);
+    if (results.length === 0) {
+      console.log('Blog not found');
+      return res.status(404).json({ message: 'Blog not found' });
+    }
+    res.json(results[0]);
+  } catch (error) {
+    console.log('Error retrieving blog post:', error);
+    res.status(500).json({ message: 'Error retrieving blog post', error: error.message });
+  }
+});
 
 // API để upload ảnh
 app.post('/api/upload', upload.single('image'), (req, res) => {
@@ -1852,290 +1658,225 @@ const createHelper = (db, helperData, callback) => {
 };
 
 // API đăng ký
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   const { Email, FullName, PhoneNumber, Address, Password, Role, AvatarUrl } = req.body;
 
-  console.log('Received payload:', req.body);
-
-  // Kiểm tra dữ liệu đầu vào
-  if (!Email || !Password || !FullName || !PhoneNumber || !Address || !Role) {
-    console.log('Missing required fields');
-    return res.status(400).json({ message: 'Email, Password, FullName, PhoneNumber, Address, and Role are required' });
-  }
-
-  // Kiểm tra Role hợp lệ
-  const validRoles = ['Admin', 'Customer', 'Helper'];
-  if (!validRoles.includes(Role)) {
-    console.log('Invalid Role:', Role);
-    return res.status(400).json({ message: 'Role must be either Admin, Customer, or Helper' });
-  }
-
-  // Kiểm tra định dạng email
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(Email)) {
-    return res.status(400).json({ message: 'Invalid email format' });
-  }
-
-  // Kiểm tra mật khẩu phức tạp
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  if (!passwordRegex.test(Password)) {
-    return res.status(400).json({
-      message: 'Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-    });
-  }
-
-  // Kiểm tra định dạng số điện thoại
-  const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-  if (!phoneRegex.test(PhoneNumber)) {
-    return res.status(400).json({ message: 'Invalid phone number format (e.g., +84888211527)' });
-  }
-
-  // Kiểm tra email trùng lặp trong bảng User
-  console.log('Checking email in User table...');
-  db.query(
-    `SELECT * FROM User WHERE Email = ?`,
-    [Email],
-    (err, existingUser) => {
-      if (err) {
-        console.error('Error checking email in User table:', err);
-        return res.status(500).json({ message: 'Error checking email', error: err.message });
-      }
-
-      console.log('Existing user result:', existingUser);
-
-      // Kiểm tra email trùng lặp trong bảng Helper
-      console.log('Checking email in Helper table...');
-      db.query(
-        `SELECT * FROM Helper WHERE Email = ?`,
-        [Email],
-        (err, existingHelper) => {
-          if (err) {
-            console.error('Error checking email in Helper table:', err);
-            return res.status(500).json({ message: 'Error checking email', error: err.message });
-          }
-
-          console.log('Existing helper result:', existingHelper);
-
-          if (existingUser.length > 0 || existingHelper.length > 0) {
-            console.log('Email already exists:', Email);
-            return res.status(400).json({
-              message: "This Account already exists, let's Sign In",
-            });
-          }
-
-          // Tạo user hoặc helper dựa trên Role
-          if (Role === 'Helper') {
-            console.log('Creating Helper...');
-            createHelper(
-              db,
-              {
-                Email,
-                HelperName: FullName,
-                Phone: PhoneNumber,
-                Address,
-                Password,
-                IMG_Helper: AvatarUrl,
-              },
-              (err, newAccount) => {
-                if (err) {
-                  console.error('Error creating helper:', err);
-                  return res.status(500).json({ message: 'Error creating helper', error: err.message });
-                }
-
-                res.status(201).json({
-                  message: 'Account created successfully!',
-                  user: newAccount,
-                });
-              }
-            );
-          } else {
-            console.log('Creating User...');
-            createUser(
-              db,
-              { Email, FullName, PhoneNumber, Address, Password, Role, AvatarUrl },
-              (err, newAccount) => {
-                if (err) {
-                  console.error('Error creating user:', err);
-                  return res.status(500).json({ message: 'Error creating user', error: err.message });
-                }
-
-                res.status(201).json({
-                  message: 'Account created successfully!',
-                  user: newAccount,
-                });
-              }
-            );
-          }
-        }
-      );
+  try {
+    // Kiểm tra dữ liệu đầu vào
+    if (!Email || !Password || !FullName || !PhoneNumber || !Address || !Role) {
+      console.log('Missing required fields');
+      return res.status(400).json({ message: 'Email, Password, FullName, PhoneNumber, Address, and Role are required' });
     }
-  );
+
+    // Kiểm tra Role hợp lệ
+    const validRoles = ['Admin', 'Customer', 'Helper'];
+    if (!validRoles.includes(Role)) {
+      console.log('Invalid Role:', Role);
+      return res.status(400).json({ message: 'Role must be either Admin, Customer, or Helper' });
+    }
+
+    // Kiểm tra định dạng email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(Email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    // Kiểm tra mật khẩu phức tạp
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(Password)) {
+      return res.status(400).json({
+        message: 'Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+      });
+    }
+
+    // Kiểm tra định dạng số điện thoại
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(PhoneNumber)) {
+      return res.status(400).json({ message: 'Invalid phone number format (e.g., +84888211527)' });
+    }
+
+    // Kiểm tra email trùng lặp trong bảng User
+    console.log('Checking email in User table...');
+    const [existingUser] = await db.query(`SELECT * FROM User WHERE Email = ?`, [Email]);
+    console.log('Existing user result:', existingUser);
+
+    // Kiểm tra email trùng lặp trong bảng Helper
+    console.log('Checking email in Helper table...');
+    const [existingHelper] = await db.query(`SELECT * FROM Helper WHERE Email = ?`, [Email]);
+    console.log('Existing helper result:', existingHelper);
+
+    if (existingUser.length > 0 || existingHelper.length > 0) {
+      console.log('Email already exists:', Email);
+      return res.status(400).json({
+        message: "This Account already exists, let's Sign In",
+      });
+    }
+
+    // Băm mật khẩu
+    const hashedPassword = await hashPassword(Password.trim());
+
+    // Tạo user hoặc helper dựa trên Role
+    if (Role === 'Helper') {
+      console.log('Creating Helper...');
+      const [result] = await db.query(
+        `
+        INSERT INTO Helper (Email, Password, HelperName, Phone, Address, IMG_Helper)
+        VALUES (?, ?, ?, ?, ?, ?)
+        `,
+        [Email, hashedPassword, FullName, PhoneNumber, Address, AvatarUrl || null]
+      );
+
+      const [newHelper] = await db.query(
+        `SELECT HelperID, Email, HelperName, Phone, Address, IMG_Helper FROM Helper WHERE HelperID = ?`,
+        [result.insertId]
+      );
+
+      res.status(201).json({
+        message: 'Account created successfully!',
+        user: {
+          ...newHelper[0],
+          FullName: newHelper[0].HelperName,
+          PhoneNumber: newHelper[0].Phone,
+          AvatarUrl: newHelper[0].IMG_Helper,
+          Role: 'Helper',
+        },
+      });
+    } else {
+      console.log('Creating User...');
+      const [result] = await db.query(
+        `
+        INSERT INTO User (Email, Password, FullName, PhoneNumber, Address, AvatarUrl, Role)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [Email, hashedPassword, FullName, PhoneNumber, Address, AvatarUrl || null, Role]
+      );
+
+      const [newUser] = await db.query(
+        `SELECT UserID, Email, FullName, PhoneNumber, Address, AvatarUrl, Role FROM User WHERE UserID = ?`,
+        [result.insertId]
+      );
+
+      res.status(201).json({
+        message: 'Account created successfully!',
+        user: newUser[0],
+      });
+    }
+  } catch (error) {
+    console.error('Error during registration:', error);
+    res.status(500).json({ message: 'Error during registration', error: error.message });
+  }
 });
 
 // API đăng nhập bằng google
-app.post('/api/google-login', (req, res) => {
+app.post('/api/google-login', async (req, res) => {
   const { Email, FullName, AvatarUrl } = req.body;
 
-  // Kiểm tra xem user đã tồn tại chưa
-  const queryCheck = 'SELECT * FROM user WHERE email = ?';
-  db.query(queryCheck, [Email], (err, results) => {
-    if (err) {
-      console.error('Database error:', err); // Ghi lại lỗi cơ sở dữ liệu
-      return res
-        .status(500)
-        .json({ message: 'Lỗi khi truy vấn cơ sở dữ liệu' });
-    }
+  try {
+    const [results] = await db.query('SELECT * FROM user WHERE email = ?', [Email]);
+
     if (results.length > 0) {
-      // Nếu user đã tồn tại, trả về thông tin
-      res
-        .status(200)
-        .json({ message: 'Đăng nhập thành công!', user: results[0] });
+      res.status(200).json({ message: 'Đăng nhập thành công!', user: results[0] });
     } else {
-      // Nếu chưa tồn tại, thêm user vào database
-      const queryInsert =
-        'INSERT INTO user (fullname, email, avatarurl) VALUES (?, ?, ?)';
-      db.query(queryInsert, [FullName, Email, AvatarUrl], (err, result) => {
-        if (err) throw err;
-        // Lấy id của user vừa thêm
-        const queryGetId = result.insertId;
-        res.status(200).json({
-          message: 'Tạo tài khoản mới và đăng nhập thành công!',
-          user: {
-            UserID: queryGetId,
-            FullName: FullName,
-            Email: Email,
-            Role: 'user',
-            AvatarUrl: AvatarUrl,
-          },
-        });
+      const [result] = await db.query(
+        'INSERT INTO user (fullname, email, avatarurl) VALUES (?, ?, ?)',
+        [FullName, Email, AvatarUrl]
+      );
+      const queryGetId = result.insertId;
+      res.status(200).json({
+        message: 'Tạo tài khoản mới và đăng nhập thành công!',
+        user: {
+          UserID: queryGetId,
+          FullName: FullName,
+          Email: Email,
+          Role: 'user',
+          AvatarUrl: AvatarUrl,
+        },
       });
     }
-  });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ message: 'Lỗi khi truy vấn cơ sở dữ liệu', error: error.message });
+  }
 });
 
 
-app.post('/api/login',  (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { Email } = req.body;
   let { Password } = req.body;
   Password = Password.trim();
 
-  // Kiểm tra dữ liệu đầu vào
-  if (!Email || !Password) {
-    return res.status(400).json({ message: 'Email and Password are required' });
-  }
-
-  // Kiểm tra định dạng email
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(Email)) {
-    return res.status(400).json({ message: 'Invalid email format' });
-  }
-
-  // Kiểm tra email trong bảng User
-  db.query(
-    `SELECT * FROM User WHERE Email = ?`,
-    [Email],
-    (err, userResults) => {
-      if (err) {
-        console.error('Database error (User table):', err);
-        return res.status(500).json({ message: 'Database error', error: err.message });
-      }
-
-      // Nếu tìm thấy user trong bảng User
-      if (userResults.length > 0) {
-        const user = userResults[0];
-
-        // Kiểm tra mật khẩu
-        bcrypt.compare(Password, user.Password, (err, isPasswordValid) => {
-          if (err) {
-            console.error('Error comparing password:', err);
-            return res.status(500).json({ message: 'Error comparing password', error: err.message });
-          }
-
-          if (!isPasswordValid) {
-            return res.status(400).json({
-              message: "Invalid email or password or you registered with Google, please login with Google",
-            });
-          }
-
-          // Tạo token
-          const token = jwt.sign(
-            { userId: user.UserID, email: user.Email, role: user.Role }, // Payload
-            'your-secret-key', // Secret key (nên lưu trong biến môi trường)
-            { expiresIn: '1h' } // Thời gian hết hạn: 1 giờ
-          );
-
-          // Đăng nhập thành công, trả về thông tin user kèm token
-          res.status(200).json({
-            message: 'Login successful',
-            token, // Trả về token
-            user: {
-              UserID: user.UserID,
-              Email: user.Email,
-              FullName: user.FullName,
-              PhoneNumber: user.PhoneNumber,
-              Address: user.Address,
-              AvatarUrl: user.AvatarUrl,
-              Role: user.Role,
-            },
-          });
-        });
-      } else {
-        // Nếu không tìm thấy trong bảng User, kiểm tra trong bảng Helper
-        db.query(
-          `SELECT * FROM Helper WHERE Email = ?`,
-          [Email],
-          (err, helperResults) => {
-            if (err) {
-              console.error('Database error (Helper table):', err);
-              return res.status(500).json({ message: 'Database error', error: err.message });
-            }
-
-            if (helperResults.length === 0) {
-              return res.status(400).json({ message: 'Invalid email or password' });
-            }
-
-            const helper = helperResults[0];
-
-            // Kiểm tra mật khẩu
-            bcrypt.compare(Password, helper.Password, (err, isPasswordValid) => {
-              if (err) {
-                console.error('Error comparing password:', err);
-                return res.status(500).json({ message: 'Error comparing password', error: err.message });
-              }
-
-              if (!isPasswordValid) {
-                return res.status(400).json({
-                  message: "Invalid email or password or you registered with Google, please login with Google",
-                });
-              }
-
-              // Tạo token
-              const token = jwt.sign(
-                { userId: helper.HelperID, email: helper.Email, role: 'Helper' }, // Payload
-                'your-secret-key', // Secret key (nên lưu trong biến môi trường)
-                { expiresIn: '12h' } // Thời gian hết hạn: 12 giờ
-              );
-
-              // Đăng nhập thành công, trả về thông tin helper kèm token
-              res.status(200).json({
-                message: 'Login successful',
-                token, // Trả về token
-                user: {
-                  UserID: helper.HelperID,
-                  Email: helper.Email,
-                  FullName: helper.HelperName,
-                  PhoneNumber: helper.Phone,
-                  Address: helper.Address,
-                  AvatarUrl: helper.IMG_Helper,
-                  Role: 'Helper',
-                },
-              });
-            });
-          }
-        );
-      }
+  try {
+    if (!Email || !Password) {
+      return res.status(400).json({ message: 'Email and Password are required' });
     }
-  );
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(Email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    const [userResults] = await db.query(`SELECT * FROM User WHERE Email = ?`, [Email]);
+
+    if (userResults.length > 0) {
+      const user = userResults[0];
+      const isPasswordValid = await bcrypt.compare(Password, user.Password);
+      if (!isPasswordValid) {
+        return res.status(400).json({ message: "Invalid email or password" });
+      }
+
+      const token = jwt.sign(
+        { userId: user.UserID, email: user.Email, role: user.Role },
+        process.env.JWT_SECRET,
+        { expiresIn: '12h' }
+      );
+      res.status(200).json({
+        message: 'Login successful',
+        token,
+        user: {
+          UserID: user.UserID,
+          Email: user.Email,
+          FullName: user.FullName,
+          PhoneNumber: user.PhoneNumber,
+          Address: user.Address,
+          AvatarUrl: user.AvatarUrl,
+          Role: user.Role,
+        },
+      });
+    } else {
+      const [helperResults] = await db.query(`SELECT * FROM Helper WHERE Email = ?`, [Email]);
+      if (helperResults.length === 0) {
+        return res.status(400).json({ message: 'Invalid email or password' });
+      }
+
+      const helper = helperResults[0];
+      const isPasswordValid = await bcrypt.compare(Password, helper.Password);
+      if (!isPasswordValid) {
+        return res.status(400).json({ message: "Invalid email or password" });
+      }
+
+      const token = jwt.sign(
+        { userId: helper.HelperID, email: helper.Email, role: 'Helper' },
+        process.env.JWT_SECRET,
+        { expiresIn: '12h' }
+      );
+      res.status(200).json({
+        message: 'Login successful',
+        token,
+        user: {
+          UserID: helper.HelperID,
+          Email: helper.Email,
+          FullName: helper.HelperName,
+          PhoneNumber: helper.Phone,
+          Address: helper.Address,
+          AvatarUrl: helper.IMG_Helper,
+          Role: 'Helper',
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ message: 'Database error', error: error.message });
+  }
 });
 
 app.post('/api/login/admin', async (req, res) => {
@@ -2203,6 +1944,155 @@ app.get('/proxy', async (req, res) => {
     res.status(500).send('Error fetching PDF');
   }
 });
+
+
+// 1. GET /availability - Lấy danh sách ngày và ca của Helper
+app.get('/availability', async (req, res) => {
+  const { helperId } = req.query;
+  console.log(`Received GET /availability with helperId: ${helperId}`);
+
+  if (!helperId) {
+    console.log('Error: Missing helperId in query');
+    return res.status(400).json({ error: 'HelperID is required' });
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT a.Date, s.Session
+       FROM availability a
+       LEFT JOIN availability_sessions s ON a.AvailabilityID = s.AvailabilityID
+       WHERE a.HelperID = ?`,
+      [helperId]
+    );
+
+    const dateShifts = {};
+    rows.forEach(row => {
+      const dateString = new Date(row.Date).toISOString().split('T')[0];
+      if (!dateShifts[dateString]) dateShifts[dateString] = [];
+      if (row.Session) dateShifts[dateString].push(row.Session.replace(' ', ''));
+    });
+
+    console.log(`Success: Fetched availability for HelperID ${helperId}`, dateShifts);
+    res.json(dateShifts);
+  } catch (error) {
+    console.error(`Error fetching availability for HelperID ${helperId}:`, error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2. POST /availability - Thêm ngày và ca mới
+app.post('/availabilityUpdate', async (req, res) => {
+  const { helperId, dates, shifts } = req.body;
+
+  if (!helperId || !dates || !shifts || !Array.isArray(dates) || !Array.isArray(shifts)) {
+    console.log('Error: Invalid request body', { helperId, dates, shifts });
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  const validShifts = ['shift1', 'shift2', 'shift3', 'fullday'];
+  if (!shifts.every(shift => validShifts.includes(shift))) {
+    console.log('Error: Invalid shift values', shifts);
+    return res.status(400).json({ error: 'Invalid shift values' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    for (const date of dates) {
+      // Kiểm tra xem ngày đã tồn tại chưa
+      const [existing] = await connection.execute(
+        'SELECT AvailabilityID FROM availability WHERE HelperID = ? AND Date = ?',
+        [helperId, date]
+      );
+
+      let availabilityId;
+      if (existing.length > 0) {
+        availabilityId = existing[0].AvailabilityID;
+        // Xóa các ca cũ để cập nhật
+        await connection.execute(
+          'DELETE FROM availability_sessions WHERE AvailabilityID = ?',
+          [availabilityId]
+        );
+        console.log(`Cleared old shifts for date ${date}, HelperID ${helperId}`);
+      } else {
+        // Thêm bản ghi mới vào availability
+        const [result] = await connection.execute(
+          'INSERT INTO availability (HelperID, Date, Status) VALUES (?, ?, ?)',
+          [helperId, date, 'Available']
+        );
+        availabilityId = result.insertId;
+        console.log(`Inserted new availability: Date ${date}, HelperID ${helperId}, AvailabilityID ${availabilityId}`);
+      }
+
+      // Thêm các ca vào availability_sessions
+      const shiftValues = shifts.map(shift => [availabilityId, shift.replace('shift', 'shift ')]); // Chuyển 'shift1' -> 'shift 1'
+      await connection.query(
+        'INSERT INTO availability_sessions (AvailabilityID, Session) VALUES ?',
+        [shiftValues]
+      );
+      console.log(`Inserted shifts for date ${date}:`, shifts);
+    }
+
+    await connection.commit();
+    console.log(`Success: Saved availability for HelperID ${helperId}`, { dates, shifts });
+    res.status(201).json({ message: 'Availability saved successfully' });
+  } catch (error) {
+    await connection.rollback();
+    console.error(`Error saving availability for HelperID ${helperId}:`, error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    connection.release();
+  }
+});
+
+// 3. DELETE /availability/:date - Xóa ca của một ngày
+app.delete('/availability/:date', async (req, res) => {
+  const { date } = req.params;
+  const { helperId } = req.query;
+
+  if (!helperId || !date) {
+    console.log('Error: Missing helperId or date', { helperId, date });
+    return res.status(400).json({ error: 'HelperID and date are required' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.execute(
+      'SELECT AvailabilityID FROM availability WHERE HelperID = ? AND Date = ?',
+      [helperId, date]
+    );
+
+    if (rows.length === 0) {
+      console.log(`No availability found for date ${date}, HelperID ${helperId}`);
+      return res.status(404).json({ error: 'Availability not found' });
+    }
+
+    const availabilityId = rows[0].AvailabilityID;
+
+    await connection.execute(
+      'DELETE FROM availability_sessions WHERE AvailabilityID = ?',
+      [availabilityId]
+    );
+    await connection.execute(
+      'DELETE FROM availability WHERE AvailabilityID = ?',
+      [availabilityId]
+    );
+
+    await connection.commit();
+    console.log(`Success: Deleted availability for date ${date}, HelperID ${helperId}`);
+    res.json({ message: 'Availability deleted successfully' });
+  } catch (error) {
+    await connection.rollback();
+    console.error(`Error deleting availability for date ${date}, HelperID ${helperId}:`, error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    connection.release();
+  }
+});
+
 
 
 ////////////////////////////////////////////////////////////////////////////////

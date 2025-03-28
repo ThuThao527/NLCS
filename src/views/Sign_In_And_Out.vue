@@ -224,11 +224,16 @@ export default {
           console.log('Saving user to localStorage:', response.data.user);
           localStorage.setItem('user', JSON.stringify(response.data.user));
           console.log('User saved to localStorage');
-          console.log('Redirecting to /');
-
-          this.router.push('/');
-
+          console.log('Redirecting to /home');
           alert(response.data.message);
+
+          this.$router.push('/').then(() => {
+          window.location.reload(); // Tải lại trang sau khi điều hướng
+      });
+
+        
+
+          
         } else {
           console.log('User not found in response');
           alert('Error: User data not found in response');
@@ -267,7 +272,7 @@ export default {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         localStorage.setItem('authToken', response.data.token);
 
-        this.router.push('/');
+        this.router.push('/home');
         alert('Sign in successful!');
       } catch (error) {
         console.error('Error during the request:', error);

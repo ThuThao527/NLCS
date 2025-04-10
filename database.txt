@@ -1,0 +1,77 @@
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+role ENUM('admin', 'user') DEFAULT 'user',
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    image_avatar VARCHAR(2055) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE
+);
+
+
+CREATE TABLE posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    author_id INT NOT NULL,
+    category_id INT NOT NULL,
+    views INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+
+CREATE TABLE post_content (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    post_id INT NOT NULL,
+     image_url TEXT DEFAULT NULL,
+    title VARCHAR(255) NOT NULL,
+    subtitle VARCHAR(255) DEFAULT NULL,
+    content_intro TEXT DEFAULT NULL,
+    quote TEXT DEFAULT NULL,
+    content_body TEXT NOT NULL,
+    link VARCHAR(2055) DEFAULT NULL,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    post_id INT NOT NULL,
+    author_id INT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE user_likes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    post_id INT NOT NULL,
+    UNIQUE(user_id, post_id), -- Tránh trùng lặp lượt thích
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+);
+
+
+-- data fake
+
+INSERT INTO users (username, role, email, password, image_avatar) VALUES
+('admin_user', 'admin', 'admin@example.com', 'hashedpassword123', 'https://example.com/avatar1.jpg'),
+('john_doe', 'user', 'john.doe@example.com', 'hashedpassword123', 'https://example.com/avatar2.jpg'),
+('jane_doe', 'user', 'jane.doe@example.com', 'hashedpassword123', 'https://example.com/avatar3.jpg'),
+('mark_smith', 'user', 'mark.smith@example.com', 'hashedpassword123', 'https://example.com/avatar4.jpg');
+
+INSERT INTO categories (name) VALUES
+('blog'),
+('reportage'),
+('Health'),
+('Education'),
+('Travel');
+
+
+
